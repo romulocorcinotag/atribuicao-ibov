@@ -2302,7 +2302,17 @@ def _fetch_fund_quotas(cnpjs: tuple, start: str, end: str) -> pd.DataFrame:
     """Fetch daily quotas for sub-funds from CVM inf_diario cache."""
     frames = []
     cache_dir = CARTEIRA_RV_CACHE
+
+    # --- Cloud mode: read from pre-exported parquet ---
     if not os.path.isdir(cache_dir):
+        pq_path = os.path.join(DATA_DIR, "fund_quotas.parquet")
+        if os.path.exists(pq_path):
+            df = pd.read_parquet(pq_path)
+            df["data"] = pd.to_datetime(df["data"])
+            cnpj_set = set(cnpjs)
+            df = df[df["cnpj_raw"].isin(cnpj_set)]
+            df = df[(df["data"] >= pd.Timestamp(start)) & (df["data"] <= pd.Timestamp(end))]
+            return df.sort_values("data").drop_duplicates(subset=["data", "cnpj_raw"], keep="last")
         return pd.DataFrame()
     inf_files = sorted(glob.glob(os.path.join(cache_dir, "cvm_inf_diario_*.parquet")))
     cnpj_set = set(cnpjs)

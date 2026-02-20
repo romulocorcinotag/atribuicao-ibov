@@ -27,20 +27,27 @@ FUNDOS_CONFIG = {
 }
 
 SUBFUNDO_NAMES = {
-    "15578434000140": "Atmos",
-    "28408121000196": "GTI Haifa",
-    "11961199000130": "Neo Navitas",
-    "42831345000137": "NV FIA",
-    "17157131000180": "Oceana Selection",
-    "26956042000194": "Oceana Valor 30",
-    "49984812000108": "Organon",
-    "13455174000190": "Santander Divi",
-    "17898543000170": "BNY ARX Liquidez",
-    "16565084000140": "SPX Apache",
-    "47508854000181": "Tarpon GT",
-    "11328882000127": "SPX Falcon",
-    "37984020000162": "Pacífico LB Ações",
-    "46192608000142": "GTIS Zetta Selection",
+    # --- Synta FIA II sub-fundos (10) ---
+    "15578434000140": "Atmos Institucional",
+    "28408121000196": "GTI Haifa FIA",
+    "11961199000130": "Neo Navitas FIC FIA",
+    "42831345000137": "NV FC FIA",
+    "17157131000180": "Oceana Selection FIC",
+    "26956042000194": "Oceana Valor 30 FIC",
+    "49984812000108": "Organon Institucional",
+    "13455174000190": "Santander Dividendos",
+    "17898543000170": "BNY ARX Liquidez RF",
+    "16565084000140": "SPX Apache FIA",
+    # --- Synta FIA sub-fundos (6) ---
+    "53827819000193": "Absolute Pace FIC FIM",
+    "51427627000164": "Atmos Institucional S",
+    "52070019000108": "Real Investor Inst FIA",
+    "40226121000170": "Perfin Infra Equity FIA",
+    "41632880000104": "SPX Falcon Inst MM",
+    "39346123000114": "Tarpon GT Institucional",
+    # --- Synta funds themselves ---
+    "51564188000131": "Synta FIA II",
+    "20214858000166": "Synta FIA",
 }
 
 
@@ -222,6 +229,88 @@ def copy_subfund_positions():
         print(f"\n⚠ posicoes_consolidado.parquet nao encontrado em {CARTEIRA_RV_DATA}")
 
 
+CARTEIRA_RV_CACHE = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\cache"
+
+# All CNPJs we need quotas for (sub-funds + Synta FIA + FIA II)
+ALL_SUBFUND_CNPJS = list(SUBFUNDO_NAMES.keys())
+
+
+def export_fund_quotas():
+    """Export daily quotas for all sub-funds from CVM inf_diario cache into a single parquet."""
+    cache_dir = CARTEIRA_RV_CACHE
+    if not os.path.isdir(cache_dir):
+        print(f"\n! Cache CVM nao encontrado: {cache_dir}")
+        return
+
+    inf_files = sorted(glob.glob(os.path.join(cache_dir, "cvm_inf_diario_*.parquet")))
+    if not inf_files:
+        print("\n! Nenhum arquivo cvm_inf_diario encontrado")
+        return
+
+    cnpj_set = set(ALL_SUBFUND_CNPJS)
+
+    # Format CNPJs as xx.xxx.xxx/xxxx-xx for matching CVM format
+    def _fmt(c):
+        c = c.zfill(14)
+        return f"{c[:2]}.{c[2:5]}.{c[5:8]}/{c[8:12]}-{c[12:14]}"
+
+    fmt_to_raw = {_fmt(c): c for c in cnpj_set}
+    frames = []
+
+    for fpath in inf_files:
+        try:
+            df = pd.read_parquet(fpath)
+        except Exception:
+            continue
+
+        # Determine CNPJ column
+        cnpj_col = None
+        for c in ["cnpj_norm", "CNPJ_FUNDO_CLASSE", "CNPJ_FUNDO"]:
+            if c in df.columns:
+                cnpj_col = c
+                break
+        dt_col = "DT_COMPTC"
+        vl_col = "VL_QUOTA"
+        if cnpj_col is None or dt_col not in df.columns or vl_col not in df.columns:
+            continue
+
+        # Filter for our CNPJs
+        if cnpj_col == "cnpj_norm":
+            mask = df[cnpj_col].isin(cnpj_set)
+        else:
+            mask = df[cnpj_col].isin(fmt_to_raw.keys())
+
+        df_f = df[mask].copy()
+        if df_f.empty:
+            continue
+
+        df_f["data"] = pd.to_datetime(df_f[dt_col])
+        if cnpj_col == "cnpj_norm":
+            df_f["cnpj_raw"] = df_f[cnpj_col]
+        else:
+            df_f["cnpj_raw"] = df_f[cnpj_col].map(fmt_to_raw)
+        df_f["nome"] = df_f["cnpj_raw"].map(SUBFUNDO_NAMES)
+        df_f["quota"] = pd.to_numeric(df_f[vl_col], errors="coerce")
+        frames.append(df_f[["data", "cnpj_raw", "nome", "quota"]].dropna())
+
+    if not frames:
+        print("\n! Nenhuma cota encontrada para os sub-fundos")
+        return
+
+    result = pd.concat(frames, ignore_index=True)
+    result = result.sort_values("data").drop_duplicates(subset=["data", "cnpj_raw"], keep="last")
+
+    out_path = os.path.join(DATA_DIR, "fund_quotas.parquet")
+    result.to_parquet(out_path, index=False)
+    n_funds = result["cnpj_raw"].nunique()
+    n_days = result["data"].nunique()
+    size = os.path.getsize(out_path) / 1024
+    print(f"\n=== Exportando cotas dos sub-fundos ===")
+    print(f"  {n_funds} fundos, {n_days} dias, {len(result)} linhas -> {out_path}")
+    print(f"  Periodo: {result['data'].min().date()} a {result['data'].max().date()}")
+    print(f"  Tamanho: {size:.0f} KB")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Exportar dados XMLs para parquets")
     parser.add_argument("--since", type=str, help="Data inicio (YYYY-MM-DD)")
@@ -242,6 +331,7 @@ def main():
 
     export_synta_timeseries(since_date)
     copy_subfund_positions()
+    export_fund_quotas()
 
     print("\nExportacao concluida!")
     print(f"Arquivos em {DATA_DIR}:")
