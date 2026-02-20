@@ -2645,19 +2645,32 @@ def render_tab_desempenho_individual():
         fig_rr.update_layout(xaxis_title="Volatilidade Anualizada (%)")
         st.plotly_chart(fig_rr, width='stretch', key="desemp_rr")
 
-    # (Ulcer Index bar chart removed per user request)
+    # ----- Retorno x Ulcer Index Scatter -----
+    st.markdown('<div class="tag-section-title">Retorno x Ulcer Index</div>', unsafe_allow_html=True)
+    st.markdown(_legenda(
+        "<b>Como ler:</b> Cada ponto = um fundo. "
+        "<b>Eixo X</b> = Ulcer Index (risco por drawdown — menor = melhor). "
+        "<b>Eixo Y</b> = Retorno acumulado. "
+        "O ideal e estar no <b>canto superior esquerdo</b> (alto retorno, baixo Ulcer Index). "
+        "Fundos com baixo Ulcer e alto retorno tem melhor <b>UPI</b> (Ulcer Performance Index)."),
+        unsafe_allow_html=True)
 
-            # ── Retorno x Ulcer Index Scatter ──
-            st.markdown('<div class="tag-section-title">Retorno x Ulcer Index</div>', unsafe_allow_html=True)
-            st.markdown(_legenda(
-                "<b>Como ler:</b> Cada ponto = um fundo. "
-                "<b>Eixo X</b> = Ulcer Index (risco por drawdown — menor = melhor). "
-                "<b>Eixo Y</b> = Retorno acumulado. "
-                "O ideal e estar no <b>canto superior esquerdo</b> (alto retorno, baixo Ulcer Index). "
-                "Fundos com baixo Ulcer e alto retorno tem melhor <b>UPI</b> (Ulcer Performance Index)."),
-                unsafe_allow_html=True)
+    if metrics_rows:
+        # Compute Ulcer Index for each fund
+        ulcer_data = []
+        for name in selected_funds:
+            if name not in fund_returns:
+                continue
+            s = fund_returns[name]
+            if len(s) < 10:
+                continue
+            cum_max = s.cummax()
+            dd_pct = s - cum_max
+            ulcer_idx = np.sqrt((dd_pct ** 2).mean())
+            ulcer_data.append({"Fundo": name, "Ulcer Index": ulcer_idx})
+
+        if ulcer_data:
             df_ulcer_scatter = pd.DataFrame(ulcer_data)
-            # Merge with metrics for return data
             df_met_tmp = pd.DataFrame(metrics_rows)
             df_ulcer_scatter = df_ulcer_scatter.merge(df_met_tmp[["Fundo", "Ret.Acum (%)"]], on="Fundo", how="inner")
             if not df_ulcer_scatter.empty and len(df_ulcer_scatter) >= 2:
@@ -2676,7 +2689,6 @@ def render_tab_desempenho_individual():
                     else:
                         color = TAG_CHART_COLORS[color_idx_ru % len(TAG_CHART_COLORS)]; symbol = "circle"; sz = 10
                         color_idx_ru += 1
-                    # UPI = Ret / Ulcer
                     upi = row["Ret.Acum (%)"] / row["Ulcer Index"] if row["Ulcer Index"] > 0.01 else 0
                     fig_ru.add_trace(go.Scatter(
                         x=[row["Ulcer Index"]], y=[row["Ret.Acum (%)"]],
