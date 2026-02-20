@@ -25,10 +25,14 @@ st.set_page_config(
 # PATHS
 # ==============================================================================
 XML_BASE = r"G:\Drives compartilhados\SisIntegra\AMBIENTE_PRODUCAO\Posicao_XML\Mellon"
-HAS_LOCAL_DATA = os.path.isdir(XML_BASE)  # False on Streamlit Cloud
 CARTEIRA_RV_DATA = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\data"
 CARTEIRA_RV_CACHE = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\cache"
 XML_FECHAMENTO = r"G:\Drives compartilhados\Arquivos_XML_Fechamento"
+
+# Cloud mode: use pre-exported parquets when local XMLs not available
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+HAS_LOCAL_XML = os.path.isdir(XML_BASE)
+HAS_PARQUET_DATA = os.path.isdir(DATA_DIR) and any(f.endswith(".parquet") for f in os.listdir(DATA_DIR) if "timeseries" in f)
 
 FUNDOS_CONFIG = {
     "Synta FIA II": {"cnpj": "51564188000131", "xml_prefix": "FD51564188000131"},
@@ -419,7 +423,10 @@ def load_subfund_positions() -> pd.DataFrame:
     frames = []
 
     # Source 1: posicoes_consolidado.parquet (primary, from XMLs + CVM already processed)
+    # Try local carteira_rv path first, then fallback to bundled data/ dir (cloud mode)
     parquet_path = os.path.join(CARTEIRA_RV_DATA, "posicoes_consolidado.parquet")
+    if not os.path.exists(parquet_path):
+        parquet_path = os.path.join(DATA_DIR, "posicoes_consolidado.parquet")
     if os.path.exists(parquet_path):
         df = pd.read_parquet(parquet_path)
         df["data"] = pd.to_datetime(df["data"])
@@ -739,13 +746,24 @@ def parse_synta_xml(filepath: str) -> dict:
 def load_synta_timeseries(fundo_key: str, start_str: str, end_str: str) -> pd.DataFrame:
     config = FUNDOS_CONFIG[fundo_key]
     prefix = config["xml_prefix"]
-    if not os.path.isdir(XML_BASE):
-        return pd.DataFrame()
     start_dt = datetime.strptime(start_str, "%Y-%m-%d").date()
     end_dt = datetime.strptime(end_str, "%Y-%m-%d").date()
-    # Buscar XMLs desde alguns dias ANTES do inicio para ter a cota base
-    # (mesmo approach que fizemos para IBOV)
     fetch_start = start_dt - timedelta(days=10)
+
+    # --- Cloud mode: read from pre-exported parquet ---
+    if not HAS_LOCAL_XML and HAS_PARQUET_DATA:
+        safe_name = fundo_key.lower().replace(" ", "_")
+        parquet_path = os.path.join(DATA_DIR, f"timeseries_{safe_name}.parquet")
+        if os.path.exists(parquet_path):
+            df = pd.read_parquet(parquet_path)
+            df["data"] = pd.to_datetime(df["data"])
+            df = df[(df["data"].dt.date >= fetch_start) & (df["data"].dt.date <= end_dt)]
+            return df
+        return pd.DataFrame()
+
+    # --- Local mode: parse XMLs ---
+    if not os.path.isdir(XML_BASE):
+        return pd.DataFrame()
     all_rows = []
     for folder_name in sorted(os.listdir(XML_BASE)):
         try:
@@ -1241,10 +1259,6 @@ def render_tab_ibov():
 # ==============================================================================
 def render_tab_synta():
     st.markdown("### Atribuicao por Componente — Synta FIA e FIA II")
-    if not HAS_LOCAL_DATA:
-        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
-                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
-        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -1426,10 +1440,6 @@ def render_tab_synta():
 # ==============================================================================
 def render_tab_brinson():
     st.markdown("### Brinson-Fachler — Synta vs IBOV")
-    if not HAS_LOCAL_DATA:
-        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
-                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
-        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30; border-radius:10px; padding:16px 20px; margin-bottom:18px;">
         <span style="color:{TAG_LARANJA};font-weight:600;font-size:1rem;">O que e o Brinson-Fachler?</span><br>
@@ -1763,10 +1773,6 @@ def render_tab_brinson():
 # ==============================================================================
 def render_tab_comparativo():
     st.markdown("### Comparativo — Synta FIA vs Synta FIA II vs IBOV")
-    if not HAS_LOCAL_DATA:
-        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
-                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
-        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -1871,10 +1877,6 @@ def render_tab_comparativo():
 # ==============================================================================
 def render_tab_carteira_explodida():
     st.markdown("### Carteira Explodida por Ativo — Visao Look-Through")
-    if not HAS_LOCAL_DATA:
-        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
-                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
-        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -2334,10 +2336,6 @@ def _fetch_fund_quotas(cnpjs: tuple, start: str, end: str) -> pd.DataFrame:
 
 def render_tab_desempenho_individual():
     st.markdown("### Desempenho Individual — Fundos e Ativos")
-    if not HAS_LOCAL_DATA:
-        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
-                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
-        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
