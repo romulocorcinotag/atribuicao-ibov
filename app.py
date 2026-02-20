@@ -2494,8 +2494,9 @@ def render_tab_desempenho_individual():
             fund_returns[fk] = cum_ret
             synta_names[fk] = True
 
-    # Direct stock/ETF holdings (e.g. BOVA11)
+    # Direct stock/ETF holdings (e.g. BOVA11, SBSP3, LVOL11)
     direct_holdings_in_chart = []
+    tickers_resolved = set()
     if direct_tickers and not ibov_prices.empty:
         for tk in direct_tickers:
             sa = f"{tk}.SA"
@@ -2504,6 +2505,26 @@ def render_tab_desempenho_individual():
                 p = p[p.index >= pd.Timestamp(dt_inicio)]
                 if len(p) >= 2:
                     cum_ret = (p / p.iloc[0] - 1) * 100
+                    label = f"{tk} (direto)"
+                    fund_returns[label] = cum_ret
+                    direct_holdings_in_chart.append(label)
+                    tickers_resolved.add(tk)
+
+    # Fallback for tickers without yfinance data: use PU from fund timeseries
+    missing_tickers = [tk for tk in direct_tickers if tk not in tickers_resolved]
+    if missing_tickers:
+        ts_df = load_synta_timeseries(fundo_key, start_fetch, end_str)
+        if not ts_df.empty:
+            ts_df["data"] = pd.to_datetime(ts_df["data"])
+            for tk in missing_tickers:
+                tk_data = ts_df[(ts_df["componente"] == tk) & (ts_df["tipo"] == "Acao/ETF")]
+                if tk_data.empty:
+                    continue
+                tk_data = tk_data[["data", "pu"]].dropna(subset=["pu"])
+                tk_data = tk_data[tk_data["pu"] > 0].drop_duplicates("data").set_index("data").sort_index()
+                tk_data = tk_data[tk_data.index >= pd.Timestamp(dt_inicio)]
+                if len(tk_data) >= 2:
+                    cum_ret = (tk_data["pu"] / tk_data["pu"].iloc[0] - 1) * 100
                     label = f"{tk} (direto)"
                     fund_returns[label] = cum_ret
                     direct_holdings_in_chart.append(label)
