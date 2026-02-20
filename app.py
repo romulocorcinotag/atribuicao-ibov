@@ -2234,17 +2234,30 @@ def render_tab_carteira_explodida():
         _chart_layout(fig_hist, "", height=450, y_title="% PL", y_suffix="%")
         st.plotly_chart(fig_hist, width='stretch', key="exp_hist_classe")
 
-        # Top components over time
-        st.markdown('<div class="tag-section-title">Evolucao dos Maiores Componentes</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como ler:</b> Evolucao do peso (% PL) dos 8 maiores componentes individuais do fundo ao longo do tempo. "
-            "Util para acompanhar se o gestor aumentou ou reduziu posicao em determinado ativo."), unsafe_allow_html=True)
+        # Stacked area of ALL components over time
+        st.markdown('<div class="tag-section-title">Evolucao Historica dos Componentes da Carteira</div>', unsafe_allow_html=True)
+        st.markdown(_legenda("<b>Como ler:</b> Area empilhada mostrando o peso (% PL) de <b>todos</b> os componentes individuais do fundo ao longo do tempo. "
+            "Os 12 maiores componentes sao exibidos individualmente; os demais sao agrupados em 'Outros'. "
+            "Util para acompanhar como a alocacao entre sub-fundos, acoes, caixa e RF evoluiu."), unsafe_allow_html=True)
         pivot_comp = df_hist.pivot_table(index="data", columns="componente", values="peso_pct", aggfunc="sum").fillna(0)
         avg_comp = pivot_comp.mean().sort_values(ascending=False)
-        top_n = avg_comp.head(8).index.tolist()
+        top_comp = avg_comp.head(12).index.tolist()
+        other_comp = [c for c in pivot_comp.columns if c not in top_comp]
+        pivot_comp_plot = pivot_comp[top_comp].copy()
+        if other_comp:
+            pivot_comp_plot["Outros"] = pivot_comp[other_comp].sum(axis=1)
         fig_comp_hist = go.Figure()
-        for i, comp_name in enumerate(top_n):
-            fig_comp_hist.add_trace(go.Scatter(x=pivot_comp.index, y=pivot_comp[comp_name], mode="lines", name=comp_name, line=dict(width=2, color=ci_h2[i])))
-        _chart_layout(fig_comp_hist, "", height=400, y_title="% PL", y_suffix="%")
+        ci_comp = TAG_CHART_COLORS * 3
+        for i, col in enumerate(pivot_comp_plot.columns):
+            fig_comp_hist.add_trace(go.Scatter(
+                x=pivot_comp_plot.index, y=pivot_comp_plot[col], mode="lines",
+                stackgroup="one", name=col, line=dict(width=0.5, color=ci_comp[i]),
+                hovertemplate=f"<b>{col}</b><br>%{{x|%d/%m/%Y}}<br>Peso: %{{y:.1f}}%<extra></extra>",
+            ))
+        _chart_layout(fig_comp_hist, "", height=500, y_title="% PL", y_suffix="%")
+        fig_comp_hist.update_layout(
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=9)),
+        )
         st.plotly_chart(fig_comp_hist, width='stretch', key="exp_hist_comp")
 
     st.markdown(f"""<div class="tag-disclaimer">
@@ -2632,55 +2645,7 @@ def render_tab_desempenho_individual():
         fig_rr.update_layout(xaxis_title="Volatilidade Anualizada (%)")
         st.plotly_chart(fig_rr, width='stretch', key="desemp_rr")
 
-    # ----- Ulcer Index chart -----
-    st.markdown('<div class="tag-section-title">Ulcer Index</div>', unsafe_allow_html=True)
-    st.markdown(_legenda(
-        "<b>Ulcer Index</b> mede o risco baseado na profundidade e duracao dos drawdowns. "
-        "Quanto <b>menor</b>, melhor — o fundo sofre quedas menores e recupera mais rapido. "
-        "Diferente da volatilidade, o Ulcer Index penaliza apenas movimentos negativos e considera tempo de recuperacao."),
-        unsafe_allow_html=True)
-
-    if metrics_rows:
-        # Compute Ulcer Index for each fund over the period
-        ulcer_data = []
-        for name in selected_funds:
-            if name not in fund_returns:
-                continue
-            s = fund_returns[name]
-            if len(s) < 10:
-                continue
-            # Ulcer Index = sqrt(mean(drawdown_pct^2))
-            cum_max = s.cummax()
-            dd_pct = s - cum_max  # drawdown in percentage points (negative)
-            ulcer_idx = np.sqrt((dd_pct ** 2).mean())
-            ulcer_data.append({"Fundo": name, "Ulcer Index": ulcer_idx})
-
-        if ulcer_data:
-            df_ulcer = pd.DataFrame(ulcer_data).sort_values("Ulcer Index", ascending=True)
-            fig_ulcer = go.Figure()
-            colors = []
-            for _, row in df_ulcer.iterrows():
-                is_bench = row["Fundo"] == "IBOVESPA"
-                is_synta = row["Fundo"] in synta_names
-                is_direct = row["Fundo"] in direct_holdings_in_chart
-                if is_bench:
-                    colors.append("#FFFFFF")
-                elif is_synta:
-                    colors.append(TAG_VERMELHO_LIGHT if "FIA II" in row["Fundo"] else TAG_LARANJA)
-                elif is_direct:
-                    colors.append("#00CED1")
-                else:
-                    colors.append(TAG_CHART_COLORS[len(colors) % len(TAG_CHART_COLORS)])
-            fig_ulcer.add_trace(go.Bar(
-                x=df_ulcer["Fundo"], y=df_ulcer["Ulcer Index"],
-                marker_color=colors,
-                text=df_ulcer["Ulcer Index"].apply(lambda x: f"{x:.2f}"),
-                textposition="outside", textfont=dict(size=10, color=TAG_OFFWHITE),
-                hovertemplate="<b>%{x}</b><br>Ulcer Index: %{y:.3f}<extra></extra>",
-            ))
-            _chart_layout(fig_ulcer, "", height=420, y_title="Ulcer Index")
-            fig_ulcer.update_layout(xaxis_tickangle=-45, bargap=0.3)
-            st.plotly_chart(fig_ulcer, width='stretch', key="desemp_ulcer")
+    # (Ulcer Index bar chart removed per user request)
 
             # ── Retorno x Ulcer Index Scatter ──
             st.markdown('<div class="tag-section-title">Retorno x Ulcer Index</div>', unsafe_allow_html=True)
