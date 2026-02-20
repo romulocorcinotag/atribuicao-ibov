@@ -1414,23 +1414,7 @@ def render_tab_synta():
     df_show = df_attr[["componente", "tipo", "peso_inicio", "peso_fim", "contribution_pct"]].copy()
     df_show.columns = ["Componente", "Tipo", "Peso Ini %", "Peso Fim %", "Contrib %"]
     st.dataframe(df_show.style.format({"Peso Ini %": "{:.2f}", "Peso Fim %": "{:.2f}", "Contrib %": "{:+.3f}"}), hide_index=True, height=min(len(df_show) * 38 + 45, 600))
-    # Stacked area
-    st.markdown('<div class="tag-section-title">Evolucao dos Pesos</div>', unsafe_allow_html=True)
-    st.markdown(_legenda("<b>Como ler:</b> Area empilhada mostrando como os pesos de cada componente evoluiram ao longo do tempo. "
-        "Cada faixa colorida = um componente. A altura total = ~100% do PL. Util para ver mudancas na alocacao."), unsafe_allow_html=True)
-    pivot_peso = df_ts.pivot_table(index="data", columns="componente", values="peso_pct", aggfunc="sum").fillna(0)
-    avg_w = pivot_peso.mean().sort_values(ascending=False)
-    top_comps = avg_w.head(12).index.tolist()
-    other = pivot_peso.drop(columns=top_comps, errors="ignore").sum(axis=1)
-    pivot_plot = pivot_peso[top_comps].copy()
-    if (other > 0).any():
-        pivot_plot["Outros"] = other
-    fig_area = go.Figure()
-    ci = TAG_CHART_COLORS * 3
-    for i, col in enumerate(pivot_plot.columns):
-        fig_area.add_trace(go.Scatter(x=pivot_plot.index, y=pivot_plot[col], mode="lines", stackgroup="one", name=col, line=dict(width=0.5, color=ci[i])))
-    _chart_layout(fig_area, "", height=450, y_title="% PL", y_suffix="%")
-    st.plotly_chart(fig_area, width='stretch', key="synta_area")
+    # (Stacked area "Evolucao dos Pesos" removed — same chart available on Carteira Explodida page)
 
 # ==============================================================================
 # PAGE 3: BRINSON-FACHLER
