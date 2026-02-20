@@ -2529,6 +2529,63 @@ def render_tab_desempenho_individual():
                     fund_returns[label] = cum_ret
                     direct_holdings_in_chart.append(label)
 
+    # Other asset types: RF, Futuros, Opcoes — use PU or vlajuste from timeseries
+    other_holdings_in_chart = []
+    ts_all = load_synta_timeseries(fundo_key, start_fetch, end_str)
+    if not ts_all.empty:
+        ts_all["data"] = pd.to_datetime(ts_all["data"])
+        ts_period = ts_all[ts_all["data"] >= pd.Timestamp(dt_inicio)]
+        # Get PL per day for contribution-based returns (futuros)
+        pl_daily = ts_period.groupby("data")["patliq"].first().sort_index() if "patliq" in ts_period.columns else pd.Series(dtype=float)
+
+        for tipo_other in ["RF", "Futuro", "Opcao Futuro", "Opcao"]:
+            tipo_data = ts_period[ts_period["tipo"] == tipo_other]
+            if tipo_data.empty:
+                continue
+
+            if tipo_other == "RF":
+                # RF has PU — build return from PU like a bond fund
+                for comp in tipo_data["componente"].unique():
+                    cd = tipo_data[tipo_data["componente"] == comp]
+                    cd_pu = cd[["data", "pu"]].dropna(subset=["pu"])
+                    cd_pu = cd_pu[cd_pu["pu"] > 0].drop_duplicates("data").set_index("data").sort_index()
+                    cd_pu = cd_pu[cd_pu.index >= pd.Timestamp(dt_inicio)]
+                    if len(cd_pu) >= 2:
+                        cum_ret = (cd_pu["pu"] / cd_pu["pu"].iloc[0] - 1) * 100
+                        fund_returns[comp] = cum_ret
+                        other_holdings_in_chart.append(comp)
+
+            elif tipo_other in ("Futuro",):
+                # Futuros: aggregate all contracts, use vlajuste/PL for daily contribution
+                if "vlajuste" in tipo_data.columns and not pl_daily.empty:
+                    aj_daily = tipo_data.groupby("data")["vlajuste"].sum().sort_index()
+                    aj_daily = aj_daily[aj_daily.index >= pd.Timestamp(dt_inicio)]
+                    # Contribution = vlajuste / PL
+                    common_dates = aj_daily.index.intersection(pl_daily.index)
+                    if len(common_dates) >= 2:
+                        contrib = aj_daily.loc[common_dates] / pl_daily.loc[common_dates]
+                        cum_contrib = (1 + contrib).cumprod()
+                        cum_ret = (cum_contrib / cum_contrib.iloc[0] - 1) * 100
+                        label = "Futuros (WIN)"
+                        fund_returns[label] = cum_ret
+                        other_holdings_in_chart.append(label)
+
+            elif tipo_other in ("Opcao Futuro", "Opcao"):
+                # Opcoes: use change in total valor / PL
+                if not pl_daily.empty:
+                    val_daily = tipo_data.groupby("data")["valor"].sum().sort_index()
+                    val_daily = val_daily[val_daily.index >= pd.Timestamp(dt_inicio)]
+                    if len(val_daily) >= 2:
+                        delta_val = val_daily.diff().fillna(0)
+                        common_dates = delta_val.index.intersection(pl_daily.index)
+                        if len(common_dates) >= 2:
+                            contrib = delta_val.loc[common_dates] / pl_daily.loc[common_dates]
+                            cum_contrib = (1 + contrib).cumprod()
+                            cum_ret = (cum_contrib / cum_contrib.iloc[0] - 1) * 100
+                            label = f"Opcoes ({tipo_other.split()[-1]})" if "Futuro" in tipo_other else "Opcoes"
+                            fund_returns[label] = cum_ret
+                            other_holdings_in_chart.append(label)
+
     # IBOV cumulative
     if not ibov_series.empty:
         ibov_period = ibov_series[ibov_series.index >= pd.Timestamp(dt_inicio)]
@@ -2557,6 +2614,7 @@ def render_tab_desempenho_individual():
         is_bench = name == "IBOVESPA"
         is_synta = name in synta_names
         is_direct = name in direct_holdings_in_chart
+        is_other = name in other_holdings_in_chart
         if is_bench:
             color = "#FFFFFF"
             width = 3
@@ -2569,6 +2627,10 @@ def render_tab_desempenho_individual():
             color = "#00CED1"  # cyan for direct holdings
             width = 2
             dash = "dot"
+        elif is_other:
+            color = "#FFD700"  # gold for RF/Futuros/Opcoes
+            width = 2
+            dash = "dashdot"
         else:
             color = TAG_CHART_COLORS[color_idx % len(TAG_CHART_COLORS)]
             width = 1.8
@@ -2672,12 +2734,15 @@ def render_tab_desempenho_individual():
         is_bench = name == "IBOVESPA"
         is_synta = name in synta_names
         is_direct = name in direct_holdings_in_chart
+        is_other = name in other_holdings_in_chart
         if is_bench:
             color = "#FFFFFF"; width = 2; dash = "dash"
         elif is_synta:
             color = TAG_VERMELHO_LIGHT if "FIA II" in name else TAG_LARANJA; width = 2.5; dash = "solid"
         elif is_direct:
             color = "#00CED1"; width = 1.5; dash = "dot"
+        elif is_other:
+            color = "#FFD700"; width = 1.5; dash = "dashdot"
         else:
             color = TAG_CHART_COLORS[color_idx % len(TAG_CHART_COLORS)]; width = 1.5; dash = "solid"
             color_idx += 1
@@ -2705,12 +2770,15 @@ def render_tab_desempenho_individual():
             is_bench = row["Fundo"] == "IBOVESPA"
             is_synta = row["Fundo"] in synta_names
             is_direct = row["Fundo"] in direct_holdings_in_chart
+            is_other = row["Fundo"] in other_holdings_in_chart
             if is_bench:
                 color = "#FFFFFF"; symbol = "star"; sz = 16
             elif is_synta:
                 color = TAG_VERMELHO_LIGHT if "FIA II" in row["Fundo"] else TAG_LARANJA; symbol = "diamond"; sz = 14
             elif is_direct:
                 color = "#00CED1"; symbol = "square"; sz = 10
+            elif is_other:
+                color = "#FFD700"; symbol = "triangle-up"; sz = 10
             else:
                 color = TAG_CHART_COLORS[color_idx % len(TAG_CHART_COLORS)]; symbol = "circle"; sz = 10
                 color_idx += 1
