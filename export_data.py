@@ -179,7 +179,7 @@ def export_synta_timeseries(since_date=None):
 
             folder_count += 1
             for pos in parsed["posicoes"]:
-                all_rows.append({
+                row = {
                     "data": pd.Timestamp(folder_date),
                     "componente": pos["componente"],
                     "tipo": pos["tipo"],
@@ -189,7 +189,10 @@ def export_synta_timeseries(since_date=None):
                     "valorcota": parsed["valorcota"],
                     "pu": pos.get("pu", 0),
                     "vlajuste": pos.get("vlajuste", 0),
-                })
+                }
+                if pos.get("cnpj"):
+                    row["cnpj"] = pos["cnpj"]
+                all_rows.append(row)
 
         if all_rows:
             df = pd.DataFrame(all_rows)

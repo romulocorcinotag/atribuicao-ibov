@@ -936,24 +936,48 @@ def explode_fund_to_stocks(fundo_key: str, ref_date_str: str) -> pd.DataFrame:
     """
     config = FUNDOS_CONFIG[fundo_key]
     prefix = config["xml_prefix"]
-
-    # Find latest XML on or before ref_date
     ref_dt = datetime.strptime(ref_date_str, "%Y-%m-%d").date()
-    xml_path = None
-    for folder_name in sorted(os.listdir(XML_BASE), reverse=True):
-        try:
-            folder_date = datetime.strptime(folder_name, "%Y%m%d").date()
-        except ValueError:
-            continue
-        if folder_date <= ref_dt:
-            xml_path = _find_synta_xml(folder_name, prefix)
-            if xml_path:
-                break
 
-    if not xml_path:
-        return pd.DataFrame()
+    parsed = None
+    # --- Cloud mode: reconstruct positions from parquet ---
+    if not HAS_LOCAL_XML and HAS_PARQUET_DATA:
+        safe_name = fundo_key.lower().replace(" ", "_")
+        parquet_path = os.path.join(DATA_DIR, f"timeseries_{safe_name}.parquet")
+        if os.path.exists(parquet_path):
+            df_pq = pd.read_parquet(parquet_path)
+            df_pq["data"] = pd.to_datetime(df_pq["data"])
+            df_pq = df_pq[df_pq["data"].dt.date <= ref_dt]
+            if not df_pq.empty:
+                latest_date = df_pq["data"].max()
+                df_snap = df_pq[df_pq["data"] == latest_date]
+                pl = df_snap["patliq"].iloc[0]
+                posicoes = []
+                for _, row in df_snap.iterrows():
+                    pos = {
+                        "componente": row["componente"], "tipo": row["tipo"],
+                        "valor": row["valor"], "peso_pct": row["peso_pct"],
+                        "pu": row.get("pu", 0),
+                    }
+                    if "cnpj" in row and pd.notna(row.get("cnpj")):
+                        pos["cnpj"] = row["cnpj"]
+                    posicoes.append(pos)
+                parsed = {"patliq": pl, "posicoes": posicoes}
 
-    parsed = parse_synta_xml(xml_path)
+    # --- Local mode: parse XML ---
+    if parsed is None and HAS_LOCAL_XML:
+        xml_path = None
+        for folder_name in sorted(os.listdir(XML_BASE), reverse=True):
+            try:
+                folder_date = datetime.strptime(folder_name, "%Y%m%d").date()
+            except ValueError:
+                continue
+            if folder_date <= ref_dt:
+                xml_path = _find_synta_xml(folder_name, prefix)
+                if xml_path:
+                    break
+        if xml_path:
+            parsed = parse_synta_xml(xml_path)
+
     if not parsed or not parsed.get("posicoes"):
         return pd.DataFrame()
 
@@ -2361,12 +2385,35 @@ def render_tab_desempenho_individual():
     # Select which Synta fund to analyze
     fundo_key = st.radio("Fundo base", list(FUNDOS_CONFIG.keys()), index=0, horizontal=True, key="desemp_fundo")
 
-    # Load XML to get sub-fund CNPJs + direct positions
+    # Load positions to get sub-fund CNPJs + direct positions
     config = FUNDOS_CONFIG[fundo_key]
     prefix = config["xml_prefix"]
     ref_dt = dt_fim
-    xml_path = None
-    if os.path.isdir(XML_BASE):
+    parsed = None
+
+    # --- Cloud mode: reconstruct from parquet ---
+    if not HAS_LOCAL_XML and HAS_PARQUET_DATA:
+        safe_name = fundo_key.lower().replace(" ", "_")
+        parquet_path = os.path.join(DATA_DIR, f"timeseries_{safe_name}.parquet")
+        if os.path.exists(parquet_path):
+            df_pq = pd.read_parquet(parquet_path)
+            df_pq["data"] = pd.to_datetime(df_pq["data"])
+            df_pq = df_pq[df_pq["data"].dt.date <= ref_dt]
+            if not df_pq.empty:
+                latest_date = df_pq["data"].max()
+                df_snap = df_pq[df_pq["data"] == latest_date]
+                posicoes = []
+                for _, row in df_snap.iterrows():
+                    pos = {"componente": row["componente"], "tipo": row["tipo"],
+                           "valor": row["valor"], "peso_pct": row["peso_pct"]}
+                    if "cnpj" in row and pd.notna(row.get("cnpj")):
+                        pos["cnpj"] = row["cnpj"]
+                    posicoes.append(pos)
+                parsed = {"posicoes": posicoes}
+
+    # --- Local mode: parse XML ---
+    if parsed is None and HAS_LOCAL_XML:
+        xml_path = None
         for folder_name in sorted(os.listdir(XML_BASE), reverse=True):
             try:
                 folder_date = datetime.strptime(folder_name, "%Y%m%d").date()
@@ -2376,21 +2423,21 @@ def render_tab_desempenho_individual():
                 xml_path = _find_synta_xml(folder_name, prefix)
                 if xml_path:
                     break
+        if xml_path:
+            parsed = parse_synta_xml(xml_path)
 
     subfund_cnpjs = []
     direct_tickers = []  # direct stock/ETF holdings in the fund
-    if xml_path:
-        parsed = parse_synta_xml(xml_path)
-        if parsed and parsed.get("posicoes"):
-            for pos in parsed["posicoes"]:
-                if pos["tipo"] == "Fundo":
-                    cnpj_sub = pos.get("cnpj", "")
-                    if cnpj_sub:
-                        subfund_cnpjs.append(cnpj_sub)
-                elif pos["tipo"] == "Acao/ETF":
-                    tk = pos.get("componente", "")
-                    if tk and _is_stock_ticker(tk) and not _is_option_ticker(tk):
-                        direct_tickers.append(tk)
+    if parsed and parsed.get("posicoes"):
+        for pos in parsed["posicoes"]:
+            if pos["tipo"] == "Fundo":
+                cnpj_sub = pos.get("cnpj", "")
+                if cnpj_sub:
+                    subfund_cnpjs.append(cnpj_sub)
+            elif pos["tipo"] == "Acao/ETF":
+                tk = pos.get("componente", "")
+                if tk and _is_stock_ticker(tk) and not _is_option_ticker(tk):
+                    direct_tickers.append(tk)
 
     if not subfund_cnpjs:
         st.warning("Sem dados de sub-fundos para o periodo selecionado.")
