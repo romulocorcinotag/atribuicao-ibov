@@ -25,6 +25,7 @@ st.set_page_config(
 # PATHS
 # ==============================================================================
 XML_BASE = r"G:\Drives compartilhados\SisIntegra\AMBIENTE_PRODUCAO\Posicao_XML\Mellon"
+HAS_LOCAL_DATA = os.path.isdir(XML_BASE)  # False on Streamlit Cloud
 CARTEIRA_RV_DATA = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\data"
 CARTEIRA_RV_CACHE = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\cache"
 XML_FECHAMENTO = r"G:\Drives compartilhados\Arquivos_XML_Fechamento"
@@ -1240,6 +1241,10 @@ def render_tab_ibov():
 # ==============================================================================
 def render_tab_synta():
     st.markdown("### Atribuicao por Componente — Synta FIA e FIA II")
+    if not HAS_LOCAL_DATA:
+        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
+                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
+        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -1421,6 +1426,10 @@ def render_tab_synta():
 # ==============================================================================
 def render_tab_brinson():
     st.markdown("### Brinson-Fachler — Synta vs IBOV")
+    if not HAS_LOCAL_DATA:
+        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
+                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
+        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30; border-radius:10px; padding:16px 20px; margin-bottom:18px;">
         <span style="color:{TAG_LARANJA};font-weight:600;font-size:1rem;">O que e o Brinson-Fachler?</span><br>
@@ -1754,6 +1763,10 @@ def render_tab_brinson():
 # ==============================================================================
 def render_tab_comparativo():
     st.markdown("### Comparativo — Synta FIA vs Synta FIA II vs IBOV")
+    if not HAS_LOCAL_DATA:
+        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
+                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
+        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -1858,6 +1871,10 @@ def render_tab_comparativo():
 # ==============================================================================
 def render_tab_carteira_explodida():
     st.markdown("### Carteira Explodida por Ativo — Visao Look-Through")
+    if not HAS_LOCAL_DATA:
+        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
+                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
+        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -2317,6 +2334,10 @@ def _fetch_fund_quotas(cnpjs: tuple, start: str, end: str) -> pd.DataFrame:
 
 def render_tab_desempenho_individual():
     st.markdown("### Desempenho Individual — Fundos e Ativos")
+    if not HAS_LOCAL_DATA:
+        st.info("📡 **Esta aba requer dados locais (XMLs BNY Mellon)** que nao estao disponiveis na nuvem. "
+                "Para acessar esta funcionalidade, rode o app localmente: `streamlit run app.py`")
+        return
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
