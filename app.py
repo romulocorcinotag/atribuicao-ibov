@@ -1135,7 +1135,6 @@ def _legenda(texto: str):
         padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:{TEXT_MUTED};">{texto}</div>"""
 
 def render_tab_ibov():
-    st.markdown("### Atribuicao de Performance do Ibovespa")
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -1282,7 +1281,6 @@ def render_tab_ibov():
 # PAGE 2: SYNTA ATTRIBUTION
 # ==============================================================================
 def render_tab_synta():
-    st.markdown("### Atribuicao por Componente — Synta FIA e FIA II")
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -1463,7 +1461,6 @@ def render_tab_synta():
 # PAGE 3: BRINSON-FACHLER
 # ==============================================================================
 def render_tab_brinson():
-    st.markdown("### Brinson-Fachler — Synta vs IBOV")
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30; border-radius:10px; padding:16px 20px; margin-bottom:18px;">
         <span style="color:{TAG_LARANJA};font-weight:600;font-size:1rem;">O que e o Brinson-Fachler?</span><br>
@@ -1796,7 +1793,6 @@ def render_tab_brinson():
 # PAGE 4: COMPARATIVO
 # ==============================================================================
 def render_tab_comparativo():
-    st.markdown("### Comparativo — Synta FIA vs Synta FIA II vs IBOV")
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -1900,7 +1896,6 @@ def render_tab_comparativo():
 # PAGE 5: CARTEIRA EXPLODIDA POR ATIVO
 # ==============================================================================
 def render_tab_carteira_explodida():
-    st.markdown("### Carteira Explodida por Ativo — Visao Look-Through")
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -2369,7 +2364,6 @@ def _fetch_fund_quotas(cnpjs: tuple, start: str, end: str) -> pd.DataFrame:
 
 
 def render_tab_desempenho_individual():
-    st.markdown("### Desempenho Individual — Fundos e Ativos")
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
@@ -2599,7 +2593,7 @@ def render_tab_desempenho_individual():
         st.warning("Sem dados de cotas disponiveis para o periodo.")
         return
 
-    # Multiselect for funds to show — default to current portfolio holdings + benchmarks
+    # Multiselect for funds to show — default to ALL current portfolio holdings + benchmarks
     current_portfolio.update(direct_holdings_in_chart)
     current_portfolio.update(other_holdings_in_chart)
     current_portfolio.update(synta_names.keys())
@@ -2609,7 +2603,9 @@ def render_tab_desempenho_individual():
     default_sel = [n for n in all_names if n in current_portfolio]
     if not default_sel:
         default_sel = all_names
-    selected_funds = st.multiselect("Selecione fundos para exibir", all_names, default=default_sel, key="desemp_sel_funds")
+    # Use dynamic key per fund so switching funds resets the multiselect to defaults
+    ms_key = f"desemp_sel_{fundo_key.replace(' ', '_')}"
+    selected_funds = st.multiselect("Selecione fundos para exibir", all_names, default=default_sel, key=ms_key)
 
     if not selected_funds:
         st.info("Selecione ao menos um fundo.")
@@ -3134,7 +3130,16 @@ def render_tab_desempenho_individual():
 # MAIN
 # ==============================================================================
 def main():
-    st.markdown("# Atribuicao de Performance")
+    # Dynamic page title per tab
+    _page_titles = {
+        "📊 Atribuicao IBOV": "Atribuicao de Performance — IBOV",
+        "📈 Synta FIA / FIA II": "Atribuicao por Componente — Synta",
+        "🔬 Brinson-Fachler": "Analise Brinson-Fachler",
+        "⚖️ Comparativo Fundos vs IBOV": "Comparativo de Fundos",
+        "🔍 Carteira Explodida por Ativo": "Carteira Explodida — Look-Through",
+        "📉 Desempenho Individual": "Desempenho Individual — Fundos e Ativos",
+    }
+    st.markdown(f"# {_page_titles.get(page_sel, 'Monitoramento de Carteira')}")
     if page_sel == "📊 Atribuicao IBOV":
         render_tab_ibov()
     elif page_sel == "📈 Synta FIA / FIA II":
