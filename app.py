@@ -2468,6 +2468,7 @@ def render_tab_desempenho_individual():
     # Build cumulative return series for each fund
     fund_returns = {}
     synta_names = {}  # track Synta FIA/FIA II names for special styling
+    current_portfolio = set()  # track names of current portfolio holdings for default selection
     if not quota_df.empty:
         # Sub-funds first
         for cnpj in subfund_cnpjs:
@@ -2480,6 +2481,7 @@ def render_tab_desempenho_individual():
                 continue
             cum_ret = (df_f / df_f.iloc[0] - 1) * 100
             fund_returns[nome] = cum_ret
+            current_portfolio.add(nome)
 
         # Synta FIA and Synta FIA II as additional lines
         for fk, cfg in FUNDOS_CONFIG.items():
@@ -2597,9 +2599,16 @@ def render_tab_desempenho_individual():
         st.warning("Sem dados de cotas disponiveis para o periodo.")
         return
 
-    # Multiselect for funds to show
+    # Multiselect for funds to show — default to current portfolio holdings + benchmarks
+    current_portfolio.update(direct_holdings_in_chart)
+    current_portfolio.update(other_holdings_in_chart)
+    current_portfolio.update(synta_names.keys())
+    if "IBOVESPA" in fund_returns:
+        current_portfolio.add("IBOVESPA")
     all_names = list(fund_returns.keys())
-    default_sel = all_names  # show all by default
+    default_sel = [n for n in all_names if n in current_portfolio]
+    if not default_sel:
+        default_sel = all_names
     selected_funds = st.multiselect("Selecione fundos para exibir", all_names, default=default_sel, key="desemp_sel_funds")
 
     if not selected_funds:
