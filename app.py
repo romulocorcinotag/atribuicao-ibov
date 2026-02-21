@@ -467,11 +467,17 @@ MASTER_CNPJ_MAP = {
 # ==============================================================================
 @st.cache_data(ttl=3600, show_spinner="Carregando posicoes dos sub-fundos...")
 def load_subfund_positions() -> pd.DataFrame:
-    """Load sub-fund stock positions from carteira_rv parquet + CVM BLC_4 fallback."""
+    """Load sub-fund stock positions from multiple sources, keeping most recent per fund.
+
+    Priority order (all are checked, most recent date wins per fund):
+      1. posicoes_consolidado.parquet (pre-merged XML+CVM data with feeder CNPJs)
+      2. posicoes_xml.parquet (BNY Mellon XMLs — may have newer data, uses master CNPJs)
+      3. posicoes_cvm.parquet (CVM downloads — uses master CNPJs)
+      4. CVM BLC_4 cache parquets (oldest fallback)
+    """
     frames = []
 
-    # Source 1: posicoes_consolidado.parquet (primary, from XMLs + CVM already processed)
-    # Try local carteira_rv path first, then fallback to bundled data/ dir (cloud mode)
+    # --- Source 1: posicoes_consolidado.parquet ---
     parquet_path = os.path.join(CARTEIRA_RV_DATA, "posicoes_consolidado.parquet")
     if not os.path.exists(parquet_path):
         parquet_path = os.path.join(DATA_DIR, "posicoes_consolidado.parquet")
@@ -482,21 +488,65 @@ def load_subfund_positions() -> pd.DataFrame:
             df["setor"] = df["ativo"].apply(classificar_setor)
         frames.append(df)
 
-    # Source 2: CVM BLC_4 cache (fallback for funds not in consolidated)
+    # --- Source 2 & 3: posicoes_xml.parquet and posicoes_cvm.parquet ---
+    # These use MASTER CNPJs — remap to feeder CNPJs via MASTER_CNPJ_MAP
+    master_to_feeders = {}  # master_cnpj -> [feeder_cnpj, ...]
+    for feeder, master in MASTER_CNPJ_MAP.items():
+        if master and master != feeder:
+            master_to_feeders.setdefault(master, []).append(feeder)
+
+    for extra_file in ["posicoes_xml.parquet", "posicoes_cvm.parquet"]:
+        extra_path = os.path.join(CARTEIRA_RV_DATA, extra_file)
+        if not os.path.exists(extra_path):
+            continue
+        try:
+            df_extra = pd.read_parquet(extra_path)
+            df_extra["data"] = pd.to_datetime(df_extra["data"])
+            if "setor" in df_extra.columns:
+                df_extra["setor"] = df_extra["ativo"].apply(classificar_setor)
+            # Remap master CNPJs to feeder CNPJs
+            remapped_rows = []
+            for master_cnpj, feeders in master_to_feeders.items():
+                master_data = df_extra[df_extra["cnpj_fundo"] == master_cnpj]
+                if master_data.empty:
+                    continue
+                for feeder_cnpj in feeders:
+                    df_copy = master_data.copy()
+                    df_copy["cnpj_fundo"] = feeder_cnpj
+                    remapped_rows.append(df_copy)
+            # Also keep rows where cnpj_fundo is already a feeder (self-mapped like SPX Apache)
+            for feeder, master in MASTER_CNPJ_MAP.items():
+                if master == feeder:
+                    direct = df_extra[df_extra["cnpj_fundo"] == feeder]
+                    if not direct.empty:
+                        remapped_rows.append(direct)
+            if remapped_rows:
+                frames.append(pd.concat(remapped_rows, ignore_index=True))
+        except Exception:
+            pass
+
+    # --- Source 4: CVM BLC_4 cache (oldest fallback) ---
     existing_cnpjs = set()
     if frames:
-        existing_cnpjs = set(frames[0]["cnpj_fundo"].unique())
+        existing_cnpjs = set(pd.concat(frames, ignore_index=True)["cnpj_fundo"].unique())
 
     cvm_rows = _load_cvm_blc4_positions(existing_cnpjs)
     if cvm_rows:
         df_cvm = pd.DataFrame(cvm_rows)
         frames.append(df_cvm)
 
-    if frames:
-        result = pd.concat(frames, ignore_index=True)
-        return result
+    if not frames:
+        return pd.DataFrame(columns=["cnpj_fundo", "data", "ativo", "valor", "pl", "pct_pl", "setor", "fonte"])
 
-    return pd.DataFrame(columns=["cnpj_fundo", "data", "ativo", "valor", "pl", "pct_pl", "setor", "fonte"])
+    # Merge all sources — for each fund, keep only the MOST RECENT date across all sources
+    result = pd.concat(frames, ignore_index=True)
+    # Find latest date per fund
+    latest_per_fund = result.groupby("cnpj_fundo")["data"].max().reset_index()
+    latest_per_fund.columns = ["cnpj_fundo", "latest_data"]
+    result = result.merge(latest_per_fund, on="cnpj_fundo")
+    result = result[result["data"] == result["latest_data"]].drop(columns=["latest_data"])
+    result = result.drop_duplicates(subset=["cnpj_fundo", "data", "ativo"], keep="last")
+    return result
 
 
 def _load_cvm_blc4_positions(existing_cnpjs: set) -> list:
