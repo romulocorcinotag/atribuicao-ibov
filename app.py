@@ -549,6 +549,89 @@ def load_subfund_positions() -> pd.DataFrame:
     return result
 
 
+@st.cache_data(ttl=3600, show_spinner="Carregando historico de composicoes...")
+def load_subfund_positions_all() -> pd.DataFrame:
+    """Load ALL historical sub-fund stock positions (all dates, not just latest).
+
+    Same sources as load_subfund_positions() but keeps all historical dates.
+    Used for historical sector evolution charts where we need the closest
+    composition snapshot for each day.
+    """
+    frames = []
+
+    # --- Source 1: posicoes_consolidado.parquet ---
+    parquet_path = os.path.join(CARTEIRA_RV_DATA, "posicoes_consolidado.parquet")
+    if not os.path.exists(parquet_path):
+        parquet_path = os.path.join(DATA_DIR, "posicoes_consolidado.parquet")
+    if os.path.exists(parquet_path):
+        df = pd.read_parquet(parquet_path)
+        df["data"] = pd.to_datetime(df["data"])
+        if "setor" in df.columns:
+            df["setor"] = df["ativo"].apply(classificar_setor)
+        frames.append(df)
+
+    # --- Source 2 & 3: posicoes_xml.parquet and posicoes_cvm.parquet ---
+    master_to_feeders = {}
+    for feeder, master in MASTER_CNPJ_MAP.items():
+        if master and master != feeder:
+            master_to_feeders.setdefault(master, []).append(feeder)
+
+    for extra_file in ["posicoes_xml.parquet", "posicoes_cvm.parquet"]:
+        extra_path = os.path.join(CARTEIRA_RV_DATA, extra_file)
+        if not os.path.exists(extra_path):
+            continue
+        try:
+            df_extra = pd.read_parquet(extra_path)
+            df_extra["data"] = pd.to_datetime(df_extra["data"])
+            if "setor" in df_extra.columns:
+                df_extra["setor"] = df_extra["ativo"].apply(classificar_setor)
+            remapped_rows = []
+            for master_cnpj, feeders in master_to_feeders.items():
+                master_data = df_extra[df_extra["cnpj_fundo"] == master_cnpj]
+                if master_data.empty:
+                    continue
+                for feeder_cnpj in feeders:
+                    df_copy = master_data.copy()
+                    df_copy["cnpj_fundo"] = feeder_cnpj
+                    remapped_rows.append(df_copy)
+            for feeder, master in MASTER_CNPJ_MAP.items():
+                if master == feeder:
+                    direct = df_extra[df_extra["cnpj_fundo"] == feeder]
+                    if not direct.empty:
+                        remapped_rows.append(direct)
+            if remapped_rows:
+                frames.append(pd.concat(remapped_rows, ignore_index=True))
+        except Exception:
+            pass
+
+    if not frames:
+        return pd.DataFrame(columns=["cnpj_fundo", "data", "ativo", "valor", "pl", "pct_pl", "setor", "fonte"])
+
+    result = pd.concat(frames, ignore_index=True)
+    # Deduplicate: for same (cnpj, date, ativo), keep last source
+    result = result.drop_duplicates(subset=["cnpj_fundo", "data", "ativo"], keep="last")
+    return result
+
+
+def _get_subfund_snapshot(subfund_positions_all: pd.DataFrame, cnpj: str,
+                          ref_date: pd.Timestamp) -> pd.DataFrame:
+    """Get the closest composition snapshot for a fund at or before ref_date.
+
+    Returns the DataFrame of positions for that fund on the closest available date.
+    """
+    df_fund = subfund_positions_all[subfund_positions_all["cnpj_fundo"] == cnpj]
+    if df_fund.empty:
+        return pd.DataFrame()
+    # Find closest date <= ref_date
+    available_dates = df_fund["data"].unique()
+    valid_dates = available_dates[available_dates <= ref_date]
+    if len(valid_dates) == 0:
+        # No date before ref_date — use earliest available
+        valid_dates = available_dates
+    closest_date = valid_dates.max()
+    return df_fund[df_fund["data"] == closest_date]
+
+
 def _load_cvm_blc4_positions(existing_cnpjs: set) -> list:
     """Load stock positions from CVM BLC_4 cache for funds not in existing data.
     Uses MASTER_CNPJ_MAP to map feeder CNPJs to their master fund CNPJs."""
@@ -2245,10 +2328,16 @@ def render_tab_carteira_explodida():
 
     if not df_hist.empty:
         # Build sector evolution: for each day, distribute component weights to real sectors
-        subfund_positions = load_subfund_positions()
+        # Use ALL historical compositions so each day uses the closest available snapshot
+        subfund_positions_all = load_subfund_positions_all()
         etf_compositions = {}  # cache ETF compositions
         sector_daily = []
         hist_dates = sorted(df_hist["data"].unique())
+
+        # Pre-resolve CNPJ for each component name (avoid repeated lookups)
+        _comp_cnpj_cache = {}
+        for cnpj, name in SUBFUNDO_NAMES.items():
+            _comp_cnpj_cache[name] = cnpj
 
         for dt in hist_dates:
             day_data = df_hist[df_hist["data"] == dt]
@@ -2261,17 +2350,11 @@ def render_tab_carteira_explodida():
                 classe = _classificar_componente(comp, tipo)
 
                 if tipo == "Fundo":
-                    # Try to explode into stocks via CVM
-                    cnpj_sub = None
-                    for cnpj, name in SUBFUNDO_NAMES.items():
-                        if name == comp:
-                            cnpj_sub = cnpj
-                            break
-                    if cnpj_sub and not subfund_positions.empty:
-                        df_sub = subfund_positions[subfund_positions["cnpj_fundo"] == cnpj_sub]
-                        if not df_sub.empty:
-                            latest = df_sub["data"].max()
-                            df_snap = df_sub[df_sub["data"] == latest]
+                    # Try to explode into stocks — use closest historical composition
+                    cnpj_sub = _comp_cnpj_cache.get(comp)
+                    if cnpj_sub and not subfund_positions_all.empty:
+                        df_snap = _get_subfund_snapshot(subfund_positions_all, cnpj_sub, pd.Timestamp(dt))
+                        if not df_snap.empty:
                             total_pct = df_snap["pct_pl"].sum()
                             scale_factor = 100.0 / total_pct if total_pct > 100 else 1.0
                             for _, srow in df_snap.iterrows():
