@@ -1226,10 +1226,15 @@ def explode_fund_to_stocks(fundo_key: str, ref_date_str: str) -> pd.DataFrame:
                     continue
 
             # No stock data found — keep as aggregate
+            # Use classe-based tipo_origem so RF/Caixa funds are not counted as equity
+            if classe in ("Caixa", "Renda Fixa"):
+                tipo_agg = "RF"
+            else:
+                tipo_agg = tipo  # "Fundo" for equity funds without CVM data
             exposures.append({
                 "ativo": comp, "setor": classe, "origem": "Direto",
                 "peso_componente": peso_no_fundo, "peso_no_subfundo": 100,
-                "exposicao_pct": peso_no_fundo, "tipo_origem": tipo,
+                "exposicao_pct": peso_no_fundo, "tipo_origem": tipo_agg,
             })
 
         elif tipo == "Acao/ETF":
