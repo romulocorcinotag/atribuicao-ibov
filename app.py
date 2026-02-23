@@ -1318,17 +1318,17 @@ def _legenda(texto: str):
 def render_tab_ibov():
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
+        <span style="color:{TAG_LARANJA};font-weight:600;">O que é esta página?</span><br>
         <span style="color:{TAG_OFFWHITE};font-size:0.88rem;">
-        Mostra a <b>atribuicao de performance do IBOV</b>: quanto cada setor e cada acao
-        contribuiu para o retorno total do indice no periodo selecionado.<br>
-        <b>Contribuicao</b> = Peso da acao no indice x Retorno da acao, calculada <b>diariamente</b>
+        Mostra a <b>atribuicao de performance do IBOV</b>: quanto cada setor e cada ação
+        contribuiu para o retorno total do índice no período selecionado.<br>
+        <b>Contribuição</b> = Peso da ação no índice x Retorno da ação, calculada <b>diariamente</b>
         e depois acumulada no periodo. A soma de todas = retorno do IBOV.
         </span></div>""", unsafe_allow_html=True)
     dt_inicio, dt_fim = period_selector("ibov")
     composition = fetch_ibov_composition()
     if not composition:
-        st.error("Nao foi possivel obter a composicao do IBOV via B3 API.")
+        st.error("Nao foi possivel obter a composição do IBOV via B3 API.")
         return
     tickers_sa = tuple(sorted(f"{tk}.SA" for tk in composition.keys()))
     # Buscar precos a partir de ~5 dias antes do inicio para garantir que temos
@@ -1351,7 +1351,7 @@ def render_tab_ibov():
     df_prices_full = df_prices.loc[mask].copy()
     df_attr, df_daily = compute_ibov_daily_attribution(composition, df_prices_full)
     if df_attr.empty:
-        st.warning("Sem dados suficientes para o periodo.")
+        st.warning("Sem dados suficientes para o período.")
         return
     df_sector = aggregate_by_sector(df_attr)
     # Retorno do IBOV = soma das contribuicoes (consistente com waterfall)
@@ -1374,13 +1374,13 @@ def render_tab_ibov():
         if worst_sec is not None:
             st.markdown(metric_card("Pior Setor", f"{worst_sec['setor']}<br><span style='font-size:1rem;color:{RED}'>{worst_sec['contribution_pct']:+.2f}%</span>"), unsafe_allow_html=True)
     with c4:
-        st.markdown(metric_card("Acoes no Indice", f"{len(df_attr)}<br><span style='font-size:1rem'>{n_pos} positivas</span>"), unsafe_allow_html=True)
+        st.markdown(metric_card("Ações no Indice", f"{len(df_attr)}<br><span style='font-size:1rem'>{n_pos} positivas</span>"), unsafe_allow_html=True)
     st.markdown("")
     # Waterfall
-    st.markdown('<div class="tag-section-title">Contribuicao por Setor (Waterfall)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tag-section-title">Contribuição por Setor (Waterfall)</div>', unsafe_allow_html=True)
     st.markdown(_legenda("<b>Como ler:</b> Cada barra mostra quanto um setor contribuiu para o retorno do IBOV. "
-        "Barras <span style='color:#6BDE97'>verdes</span> = contribuicao positiva. "
-        "Barras <span style='color:#ED5A6E'>vermelhas</span> = contribuicao negativa. "
+        "Barras <span style='color:#6BDE97'>verdes</span> = contribuição positiva. "
+        "Barras <span style='color:#ED5A6E'>vermelhas</span> = contribuição negativa. "
         "A barra <span style='color:#FF8853'>laranja</span> no final = retorno total do IBOV (soma de tudo)."), unsafe_allow_html=True)
     df_s = df_sector.sort_values("contribution_pct", ascending=False)
     fig_wf = go.Figure(go.Waterfall(orientation="v",
@@ -1396,11 +1396,11 @@ def render_tab_ibov():
     fig_wf.update_layout(xaxis_tickangle=-45, xaxis_tickfont=dict(size=10))
     st.plotly_chart(fig_wf, width='stretch', key="ibov_wf")
     # Waterfall by individual stock (Top 30)
-    st.markdown('<div class="tag-section-title">Contribuicao por Ativo (Waterfall Top 30)</div>', unsafe_allow_html=True)
-    st.markdown(_legenda("<b>Como ler:</b> Mesmo conceito do waterfall setorial, mas decomposto por <b>acao individual</b>. "
+    st.markdown('<div class="tag-section-title">Contribuição por Ativo (Waterfall Top 30)</div>', unsafe_allow_html=True)
+    st.markdown(_legenda("<b>Como ler:</b> Mesmo conceito do waterfall setorial, mas decomposto por <b>ação individual</b>. "
         "Mostra as 30 acoes com maior contribuicao absoluta (positiva ou negativa). "
-        "Barras <span style='color:#6BDE97'>verdes</span> = acao que ajudou, "
-        "<span style='color:#ED5A6E'>vermelhas</span> = acao que prejudicou. "
+        "Barras <span style='color:#6BDE97'>verdes</span> = ação que ajudou, "
+        "<span style='color:#ED5A6E'>vermelhas</span> = ação que prejudicou. "
         "A barra <span style='color:#FF8853'>laranja</span> = retorno total do IBOV."), unsafe_allow_html=True)
     df_top20 = df_attr.reindex(df_attr["contribution_pct"].abs().sort_values(ascending=False).index).head(30)
     df_top20 = df_top20.sort_values("contribution_pct", ascending=False)
@@ -1419,7 +1419,7 @@ def render_tab_ibov():
 
     # Bar + Table
     st.markdown('<div class="tag-section-title">Detalhamento Setorial</div>', unsafe_allow_html=True)
-    st.markdown(_legenda("<b>Como ler:</b> A barra horizontal mostra a contribuicao de cada setor (mesma info do waterfall, "
+    st.markdown(_legenda("<b>Como ler:</b> A barra horizontal mostra a contribuição de cada setor (mesma info do waterfall, "
         "em layout diferente). A tabela ao lado detalha: <b>Peso %</b> = quanto o setor pesa no IBOV, "
         "<b>Retorno %</b> = retorno medio do setor, <b>Contrib %</b> = Peso x Retorno."), unsafe_allow_html=True)
     col_c, col_t = st.columns([3, 2])
@@ -1436,10 +1436,10 @@ def render_tab_ibov():
         df_show.columns = ["Setor", "Peso %", "Retorno %", "Contrib %", "N"]
         st.dataframe(df_show.style.format({"Peso %": "{:.2f}", "Retorno %": "{:+.2f}", "Contrib %": "{:+.3f}", "N": "{:.0f}"}), hide_index=True, height=min(len(df_show) * 38 + 45, 500))
     # Top/Bottom
-    st.markdown('<div class="tag-section-title">Maiores Contribuicoes Individuais</div>', unsafe_allow_html=True)
-    st.markdown(_legenda("<b>Como ler:</b> As acoes que mais contribuiram (<span style='color:#6BDE97'>verde</span>, "
+    st.markdown('<div class="tag-section-title">Maiores Contribuições Individuais</div>', unsafe_allow_html=True)
+    st.markdown(_legenda("<b>Como ler:</b> As ações que mais contribuíram (<span style='color:#6BDE97'>verde</span>, "
         "esquerda) e mais prejudicaram (<span style='color:#ED5A6E'>vermelho</span>, direita) o retorno do IBOV. "
-        "Uma acao com peso grande e retorno alto contribui muito; uma com peso grande e retorno negativo prejudica."), unsafe_allow_html=True)
+        "Uma ação com peso grande e retorno alto contribui muito; uma com peso grande e retorno negativo prejudica."), unsafe_allow_html=True)
     n_show = min(10, len(df_attr))
     df_top = df_attr.nlargest(n_show, "contribution_pct")
     df_bot = df_attr.nsmallest(n_show, "contribution_pct")
@@ -1464,18 +1464,18 @@ def render_tab_ibov():
 def render_tab_synta():
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
+        <span style="color:{TAG_LARANJA};font-weight:600;">O que é esta página?</span><br>
         <span style="color:{TAG_OFFWHITE};font-size:0.88rem;">
         Mostra quanto cada ativo/fundo da carteira contribuiu para o retorno total do Synta.<br>
-        <b>Metodo:</b> Contribuicao = Peso do ativo no dia anterior x Retorno do ativo no dia (via PU).
-        Para futuros, usa o ajuste diario (P&amp;L real). Contribuicoes sao escaladas para somar o retorno da cota.
+        <b>Metodo:</b> Contribuição = Peso do ativo no dia anterior x Retorno do ativo no dia (via PU).
+        Para futuros, usa o ajuste diário (P&amp;L real). Contribuições são escaladas para somar o retorno da cota.
         </span></div>""", unsafe_allow_html=True)
     fundo_sel = st.radio("Fundo", list(FUNDOS_CONFIG.keys()), horizontal=True, key="synta_fundo")
     dt_inicio, dt_fim = period_selector("synta")
     start_str, end_str = dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")
     df_ts = load_synta_timeseries(fundo_sel, start_str, end_str)
     if df_ts.empty:
-        st.warning(f"Sem dados de XML para {fundo_sel} no periodo.")
+        st.warning(f"Sem dados de XML para {fundo_sel} no período.")
         return
     df_attr = compute_synta_attribution(df_ts, period_start=start_str)
     if df_attr.empty:
@@ -1498,11 +1498,11 @@ def render_tab_synta():
         st.markdown(metric_card("Menor Contrib.", f"{worst['componente']}<br><span style='font-size:0.9rem;color:{RED}'>{worst['contribution_pct']:+.2f}%</span>"), unsafe_allow_html=True)
     st.markdown("")
     # Waterfall
-    st.markdown('<div class="tag-section-title">Waterfall — Contribuicao por Componente</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tag-section-title">Waterfall — Contribuição por Componente</div>', unsafe_allow_html=True)
     st.markdown(_legenda("<b>Como ler:</b> Cada barra mostra quanto aquele componente da carteira contribuiu para o retorno total "
-        "do fundo no periodo. Barras <span style='color:#6BDE97'>verdes</span> = contribuicao positiva, "
+        "do fundo no período. Barras <span style='color:#6BDE97'>verdes</span> = contribuição positiva, "
         "<span style='color:#ED5A6E'>vermelhas</span> = negativa. A barra <span style='color:#FF8853'>laranja</span> = retorno total "
-        "(soma). A contribuicao e calculada <b>diariamente</b> (peso dia anterior x retorno do dia) e depois acumulada no periodo."), unsafe_allow_html=True)
+        "(soma). A contribuição e calculada <b>diariamente</b> (peso dia anterior x retorno do dia) e depois acumulada no período."), unsafe_allow_html=True)
     df_wf = df_attr.sort_values("contribution_pct", ascending=False)
     fig_wf = go.Figure(go.Waterfall(orientation="v",
         measure=["relative"] * len(df_wf) + ["total"],
@@ -1516,13 +1516,13 @@ def render_tab_synta():
     st.plotly_chart(fig_wf, width='stretch', key="synta_wf")
 
     # ── Waterfall — Contribuicao por Ativo Individual (exploded) ──
-    st.markdown('<div class="tag-section-title">Waterfall — Contribuicao Estimada por Ativo Individual</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tag-section-title">Waterfall — Contribuição Estimada por Ativo Individual</div>', unsafe_allow_html=True)
     st.markdown(_legenda(
-        "<b>Como ler:</b> Distribui a contribuicao de cada sub-fundo entre as acoes que ele detem (via dados CVM). "
-        "A contribuicao de cada acao e <b>estimada</b> proporcionalmente ao peso dela no sub-fundo.<br>"
+        "<b>Como ler:</b> Distribui a contribuição de cada sub-fundo entre as ações que ele detem (via dados CVM). "
+        "A contribuição de cada ação e <b>estimada</b> proporcionalmente ao peso dela no sub-fundo.<br>"
         "<span style='color:#FF8853;'>⚠ Importante:</span> As carteiras dos sub-fundos vem do CVM e podem ter "
-        "<b>defasagem de ate 3-6 meses</b>. Os pesos reais podem ter mudado. Use como <b>indicacao direcional</b>, "
-        "nao como valor exato. Top 30 ativos por contribuicao absoluta."), unsafe_allow_html=True)
+        "<b>defasagem de até 3-6 meses</b>. Os pesos reais podem ter mudado. Use como <b>indicacao direcional</b>, "
+        "não como valor exato. Top 30 ativos por contribuição absoluta."), unsafe_allow_html=True)
 
     # Explode sub-fund contributions to individual stocks
     df_exp = explode_fund_to_stocks(fundo_sel, end_str)
@@ -1627,12 +1627,12 @@ def render_tab_synta():
             st.dataframe(df_stk_show.style.format({"Contrib Est. (%)": "{:+.4f}"}),
                           hide_index=True, height=min(len(df_stk_show) * 35 + 45, 500))
     else:
-        st.info("Sem dados de carteiras explodidas para calcular contribuicao por ativo.")
+        st.info("Sem dados de carteiras explodidas para calcular contribuição por ativo.")
 
     # Table
     st.markdown('<div class="tag-section-title">Detalhamento por Componente</div>', unsafe_allow_html=True)
-    st.markdown(_legenda("<b>Colunas:</b> <b>Peso Ini/Fim %</b> = peso do componente no PL no inicio e fim do periodo. "
-        "<b>Contrib %</b> = contribuicao acumulada no periodo (soma diaria de peso(t-1) x retorno(t))."), unsafe_allow_html=True)
+    st.markdown(_legenda("<b>Colunas:</b> <b>Peso Ini/Fim %</b> = peso do componente no PL no inicio e fim do período. "
+        "<b>Contrib %</b> = contribuição acumulada no período (soma diaria de peso(t-1) x retorno(t))."), unsafe_allow_html=True)
     df_show = df_attr[["componente", "tipo", "peso_inicio", "peso_fim", "contribution_pct"]].copy()
     df_show.columns = ["Componente", "Tipo", "Peso Ini %", "Peso Fim %", "Contrib %"]
     st.dataframe(df_show.style.format({"Peso Ini %": "{:.2f}", "Peso Fim %": "{:.2f}", "Contrib %": "{:+.3f}"}), hide_index=True, height=min(len(df_show) * 38 + 45, 600))
@@ -1644,15 +1644,15 @@ def render_tab_synta():
 def render_tab_brinson():
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30; border-radius:10px; padding:16px 20px; margin-bottom:18px;">
-        <span style="color:{TAG_LARANJA};font-weight:600;font-size:1rem;">O que e o Brinson-Fachler?</span><br>
+        <span style="color:{TAG_LARANJA};font-weight:600;font-size:1rem;">O que é o Brinson-Fachler?</span><br>
         <span style="color:{TAG_OFFWHITE};font-size:0.88rem;">
-        E um metodo classico que responde: <b>"Por que o fundo rendeu diferente do IBOV?"</b><br>
-        Ele decompoe a diferenca de retorno (<b>excesso</b>) em 3 efeitos:<br>
-        <b style="color:{TAG_CHART_COLORS[0]};">Alocacao</b> = o fundo alocou nos setores certos?&emsp;
-        <b style="color:{TAG_CHART_COLORS[1]};">Selecao</b> = escolheu os melhores ativos dentro de cada setor?&emsp;
-        <b style="color:{TAG_CHART_COLORS[2]};">Interacao</b> = efeito combinado dos dois.<br>
-        <span style="color:{TAG_LARANJA};">⚠ Os pesos setoriais do fundo sao calculados via <b>carteira explodida</b> (sub-fundos decompostos em
-        acoes individuais via dados CVM). As carteiras podem ter defasagem de ate 3-6 meses.</span>
+        É um método clássico que responde: <b>"Por que o fundo rendeu diferente do IBOV?"</b><br>
+        Ele decompõe a diferença de retorno (<b>excesso</b>) em 3 efeitos:<br>
+        <b style="color:{TAG_CHART_COLORS[0]};">Alocação</b> = o fundo alocou nos setores certos?&emsp;
+        <b style="color:{TAG_CHART_COLORS[1]};">Seleção</b> = escolheu os melhores ativos dentro de cada setor?&emsp;
+        <b style="color:{TAG_CHART_COLORS[2]};">Interação</b> = efeito combinado dos dois.<br>
+        <span style="color:{TAG_LARANJA};">⚠ Os pesos setoriais do fundo são calculados via <b>carteira explodida</b> (sub-fundos decompostos em
+        ações individuais via dados CVM). As carteiras podem ter defasagem de até 3-6 meses.</span>
         </span></div>""", unsafe_allow_html=True)
     fundo_sel = st.radio("Fundo", list(FUNDOS_CONFIG.keys()), horizontal=True, key="bf_fundo")
     dt_inicio, dt_fim = period_selector("bf")
@@ -1668,7 +1668,7 @@ def render_tab_brinson():
     ret_fundo = df_fund_attr["retorno_total_fundo"].iloc[0]
     composition = fetch_ibov_composition()
     if not composition:
-        st.error("Composicao IBOV indisponivel.")
+        st.error("Composição IBOV indisponivel.")
         return
     tickers_sa = tuple(sorted(f"{tk}.SA" for tk in composition.keys()))
     start_fetch = (dt_inicio - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -1801,25 +1801,25 @@ def render_tab_brinson():
         cl = GREEN if excess >= 0 else RED
         st.markdown(metric_card("Excesso", f"<span style='color:{cl}'>{excess:+.2f}%</span>"), unsafe_allow_html=True)
     with c4:
-        st.markdown(metric_card("Ef. Alocacao", f"{ta:+.2f}%"), unsafe_allow_html=True)
+        st.markdown(metric_card("Ef. Alocação", f"{ta:+.2f}%"), unsafe_allow_html=True)
     with c5:
-        st.markdown(metric_card("Ef. Selecao", f"{ts:+.2f}%"), unsafe_allow_html=True)
+        st.markdown(metric_card("Ef. Seleção", f"{ts:+.2f}%"), unsafe_allow_html=True)
     st.markdown("")
 
     # =============================================
     # GRAFICO 1: Waterfall — Decomposicao do Excesso
     # =============================================
     st.markdown(f"""<span style="color:{TAG_LARANJA};font-weight:600;font-size:1.05rem;">
-        Decomposicao do Excesso de Retorno</span>""", unsafe_allow_html=True)
+        Decomposição do Excesso de Retorno</span>""", unsafe_allow_html=True)
     st.markdown(f"""<div style="background:{TAG_BG_CARD};border:1px solid {TAG_VERMELHO}20;border-radius:8px;
         padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:{TEXT_MUTED};">
-        <b>Como ler:</b> Cada barra mostra quanto cada efeito contribuiu para a diferenca entre o fundo e o IBOV.
+        <b>Como ler:</b> Cada barra mostra quanto cada efeito contribuiu para a diferença entre o fundo e o IBOV.
         A soma dos 3 efeitos = excesso total.<br>
-        <b style="color:{TAG_CHART_COLORS[0]};">Alocacao</b>: (Peso Fundo - Peso IBOV) x (Ret. Setor IBOV - Ret. Total IBOV) &mdash;
+        <b style="color:{TAG_CHART_COLORS[0]};">Alocação</b>: (Peso Fundo - Peso IBOV) x (Ret. Setor IBOV - Ret. Total IBOV) &mdash;
         <i>o fundo apostou nos setores certos?</i><br>
-        <b style="color:{TAG_CHART_COLORS[1]};">Selecao</b>: Peso IBOV x (Ret. Setor Fundo - Ret. Setor IBOV) &mdash;
+        <b style="color:{TAG_CHART_COLORS[1]};">Seleção</b>: Peso IBOV x (Ret. Setor Fundo - Ret. Setor IBOV) &mdash;
         <i>dentro de cada setor, o fundo escolheu os melhores ativos?</i><br>
-        <b style="color:{TAG_CHART_COLORS[2]};">Interacao</b>: (Peso Fundo - Peso IBOV) x (Ret. Setor Fundo - Ret. Setor IBOV) &mdash;
+        <b style="color:{TAG_CHART_COLORS[2]};">Interação</b>: (Peso Fundo - Peso IBOV) x (Ret. Setor Fundo - Ret. Setor IBOV) &mdash;
         <i>efeito cruzado entre alocacao e selecao.</i>
         </div>""", unsafe_allow_html=True)
     fig_dec = go.Figure(go.Waterfall(orientation="v", measure=["relative"] * 3 + ["total"],
@@ -1835,14 +1835,14 @@ def render_tab_brinson():
     # GRAFICO 2: Comparativo de Pesos — Fundo vs IBOV
     # =============================================
     st.markdown(f"""<span style="color:{TAG_LARANJA};font-weight:600;font-size:1.05rem;">
-        Comparativo de Alocacao por Setor — Fundo vs IBOV</span>""", unsafe_allow_html=True)
+        Comparativo de Alocação por Setor — Fundo vs IBOV</span>""", unsafe_allow_html=True)
     st.markdown(f"""<div style="background:{TAG_BG_CARD};border:1px solid {TAG_VERMELHO}20;border-radius:8px;
         padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:{TEXT_MUTED};">
         <b>Como ler:</b> Compara quanto (%) o fundo e o IBOV tem em cada setor.
         Barras alinhadas = alocacao similar. Diferenca grande = aposta ativa do gestor.
-        Os pesos do fundo sao calculados a partir da <b>carteira explodida</b> (sub-fundos decompostos em acoes individuais via CVM).
+        Os pesos do fundo são calculados a partir da <b>carteira explodida</b> (sub-fundos decompostos em ações individuais via CVM).
         Categorias como "Renda Fixa" e "Caixa" aparecem no fundo mas nao no IBOV.
-        <br><span style="color:{TAG_LARANJA};">⚠</span> Pesos do fundo baseados em dados CVM (defasagem ate 3-6 meses).
+        <br><span style="color:{TAG_LARANJA};">⚠</span> Pesos do fundo baseados em dados CVM (defasagem até 3-6 meses).
         </div>""", unsafe_allow_html=True)
     df_bfs = df_bf.sort_values("peso_bench", ascending=True)
     fig_pesos = go.Figure()
@@ -1868,7 +1868,7 @@ def render_tab_brinson():
         Se a barra laranja ({fundo_sel}) e maior que a azul (IBOV), o fundo selecionou
         ativos melhores naquele setor. Os retornos do fundo sao estimados via atribuicao por componente,
         distribuida proporcionalmente entre as acoes de cada sub-fundo (carteira CVM).
-        <br><span style="color:{TAG_LARANJA};">⚠</span> Retornos setoriais do fundo sao <b>estimativas</b> (carteiras CVM com defasagem).
+        <br><span style="color:{TAG_LARANJA};">⚠</span> Retornos setoriais do fundo são <b>estimativas</b> (carteiras CVM com defasagem).
         </div>""", unsafe_allow_html=True)
     df_bfr = df_bf.sort_values("ret_bench", ascending=True)
     fig_rets = go.Figure()
@@ -1890,7 +1890,7 @@ def render_tab_brinson():
         Efeitos Brinson-Fachler por Setor</span>""", unsafe_allow_html=True)
     st.markdown(f"""<div style="background:{TAG_BG_CARD};border:1px solid {TAG_VERMELHO}20;border-radius:8px;
         padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:{TEXT_MUTED};">
-        <b>Como ler:</b> Cada setor e decomposto nos 3 efeitos. Barras para a <b>direita</b> = contribuiram
+        <b>Como ler:</b> Cada setor e decomposto nos 3 efeitos. Barras para a <b>direita</b> = contribuíram
         positivamente para o excesso. Barras para a <b>esquerda</b> = prejudicaram.
         A soma de todos os setores = excesso total do fundo vs IBOV.
         </div>""", unsafe_allow_html=True)
@@ -1911,7 +1911,7 @@ def render_tab_brinson():
     # GRAFICO 5: Top Setores — Quem mais ajudou/prejudicou
     # =============================================
     st.markdown(f"""<span style="color:{TAG_LARANJA};font-weight:600;font-size:1.05rem;">
-        Top Setores — Maiores Contribuicoes para o Excesso</span>""", unsafe_allow_html=True)
+        Top Setores — Maiores Contribuições para o Excesso</span>""", unsafe_allow_html=True)
     st.markdown(f"""<div style="background:{TAG_BG_CARD};border:1px solid {TAG_VERMELHO}20;border-radius:8px;
         padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:{TEXT_MUTED};">
         <b>Como ler:</b> Ranking dos setores que mais ajudaram (<span style="color:{GREEN};">verde</span>)
@@ -1940,8 +1940,8 @@ def render_tab_brinson():
         padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:{TEXT_MUTED};">
         <b>Colunas:</b><br>
         <b>Peso Fundo/IBOV %</b> = quanto (%) cada setor representa na carteira do fundo e no IBOV.<br>
-        <b>Ret Fundo/IBOV %</b> = retorno dos ativos daquele setor no fundo e no IBOV no periodo.<br>
-        <b>Alocacao/Selecao/Interacao %</b> = os 3 efeitos Brinson-Fachler para cada setor.<br>
+        <b>Ret Fundo/IBOV %</b> = retorno dos ativos daquele setor no fundo e no IBOV no período.<br>
+        <b>Alocação/Seleção/Interação %</b> = os 3 efeitos Brinson-Fachler para cada setor.<br>
         <b>Total %</b> = soma dos 3 efeitos; quanto aquele setor contribuiu para o excesso de retorno.
         </div>""", unsafe_allow_html=True)
     df_bf_show = df_bf[["setor", "peso_fundo", "peso_bench", "ret_fundo", "ret_bench", "alocacao", "selecao", "interacao", "total"]].copy()
@@ -1962,7 +1962,7 @@ def render_tab_brinson():
         border:1px solid {TAG_LARANJA}40; border-radius:10px; padding:16px 20px; margin-top:10px;">
         <span style="color:{TAG_LARANJA};font-weight:600;font-size:1rem;">Resumo da Analise</span><br>
         <span style="color:{TAG_OFFWHITE};font-size:0.88rem;">
-        O <b>{fundo_sel}</b> rendeu <b>{ret_fundo:+.2f}%</b> no periodo, enquanto o IBOV rendeu <b>{ret_ibov:+.2f}%</b>,
+        O <b>{fundo_sel}</b> rendeu <b>{ret_fundo:+.2f}%</b> no período, enquanto o IBOV rendeu <b>{ret_ibov:+.2f}%</b>,
         gerando um excesso de <b>{excess:+.2f}%</b>.<br><br>
         O efeito mais relevante foi a <b>{efeito_desc[maior_ef_name]}</b>,
         que impactou {dir_ef} em <b>{maior_ef_val:+.2f}%</b>.<br>
@@ -1976,10 +1976,10 @@ def render_tab_brinson():
 def render_tab_comparativo():
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
+        <span style="color:{TAG_LARANJA};font-weight:600;">O que é esta página?</span><br>
         <span style="color:{TAG_OFFWHITE};font-size:0.88rem;">
         Compara o desempenho dos fundos Synta FIA e FIA II contra o IBOV.
-        <b>Excesso</b> = retorno do fundo - retorno do IBOV. Positivo = fundo superou o indice.
+        <b>Excesso</b> = retorno do fundo - retorno do IBOV. Positivo = fundo superou o índice.
         </span></div>""", unsafe_allow_html=True)
     dt_inicio, dt_fim = period_selector("comp")
     start_str, end_str = dt_inicio.strftime("%Y-%m-%d"), dt_fim.strftime("%Y-%m-%d")
@@ -1991,7 +1991,7 @@ def render_tab_comparativo():
         return
     composition = fetch_ibov_composition()
     if not composition:
-        st.error("Composicao IBOV indisponivel.")
+        st.error("Composição IBOV indisponivel.")
         return
     tickers_sa = tuple(sorted(f"{tk}.SA" for tk in composition.keys()))
     start_fetch = (dt_inicio - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -2038,8 +2038,8 @@ def render_tab_comparativo():
     st.markdown("")
     # Cumulative returns
     st.markdown('<div class="tag-section-title">Retorno Acumulado</div>', unsafe_allow_html=True)
-    st.markdown(_legenda("<b>Como ler:</b> Evolucao do retorno acumulado (%) de cada fundo e do IBOV desde o inicio do periodo. "
-        "Se a linha do fundo esta acima do IBOV, o fundo esta superando o indice naquele momento."), unsafe_allow_html=True)
+    st.markdown(_legenda("<b>Como ler:</b> Evolução do retorno acumulado (%) de cada fundo e do IBOV desde o inicio do período. "
+        "Se a linha do fundo esta acima do IBOV, o fundo esta superando o índice naquele momento."), unsafe_allow_html=True)
     fig_cum = go.Figure()
     ibov_dr = ibov_p.pct_change(fill_method=None).fillna(0)
     ibov_cum = ((1 + ibov_dr).cumprod() - 1) * 100
@@ -2079,12 +2079,12 @@ def render_tab_comparativo():
 def render_tab_carteira_explodida():
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
+        <span style="color:{TAG_LARANJA};font-weight:600;">O que é esta página?</span><br>
         <span style="color:{TAG_OFFWHITE};font-size:0.88rem;">
         O fundo investe em sub-fundos (Tarpon, Atmos, SPX, etc.) e ETFs (BOVA11, DIVO11).
-        Esta pagina <b>"explode"</b> esses investimentos para revelar a <b>exposicao real a cada acao individual</b>.<br>
-        Ex: Se o fundo tem 15% no SPX Falcon e o SPX tem 5% em PETR4, entao a exposicao real a PETR4 via SPX = 0.75%.<br>
-        <b>Fundos sem dados de composicao disponiveis aparecem como "nao explodido".</b>
+        Esta pagina <b>"explode"</b> esses investimentos para revelar a <b>exposição real a cada ação individual</b>.<br>
+        Ex: Se o fundo tem 15% no SPX Falcon e o SPX tem 5% em PETR4, então a exposição real a PETR4 via SPX = 0.75%.<br>
+        <b>Fundos sem dados de composição disponíveis aparecem como "não explodido".</b>
         </span></div>""", unsafe_allow_html=True)
 
     fundo_sel = st.radio("Fundo", list(FUNDOS_CONFIG.keys()), horizontal=True, key="exp_fundo")
@@ -2123,9 +2123,9 @@ def render_tab_carteira_explodida():
     # Metrics
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.markdown(metric_card("Acoes Unicas", f"{n_stocks}"), unsafe_allow_html=True)
+        st.markdown(metric_card("Ações Unicas", f"{n_stocks}"), unsafe_allow_html=True)
     with c2:
-        st.markdown(metric_card("Exposicao Acoes", f"{total_eq:.1f}%"), unsafe_allow_html=True)
+        st.markdown(metric_card("Exposição Ações", f"{total_eq:.1f}%"), unsafe_allow_html=True)
     with c3:
         st.markdown(metric_card("Outros (RF/Caixa/Fut)", f"{total_other:.1f}%"), unsafe_allow_html=True)
     with c4:
@@ -2137,7 +2137,7 @@ def render_tab_carteira_explodida():
     if not df_agg.empty:
         # ── Top 20 exposures bar chart ──
         st.markdown('<div class="tag-section-title">Top 20 — Maiores Exposicoes Individuais</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como ler:</b> As 20 acoes com maior exposicao real (% do PL) considerando "
+        st.markdown(_legenda("<b>Como ler:</b> As 20 ações com maior exposição real (% do PL) considerando "
             "todas as vias (direto, via sub-fundos, via ETFs). Passe o mouse para ver por qual fundo/ETF veio."), unsafe_allow_html=True)
         df_top20 = df_agg.head(20).sort_values("exposicao_pct")
         fig_top = go.Figure(go.Bar(
@@ -2146,15 +2146,15 @@ def render_tab_carteira_explodida():
             text=[f"{v:.2f}%" for v in df_top20["exposicao_pct"]],
             textposition="outside", textfont=dict(size=9, color=TAG_OFFWHITE),
             customdata=df_top20[["setor", "origens"]].values,
-            hovertemplate="<b>%{y}</b><br>Exposicao: %{x:.2f}%<br>Setor: %{customdata[0]}<br>Via: %{customdata[1]}<extra></extra>",
+            hovertemplate="<b>%{y}</b><br>Exposição: %{x:.2f}%<br>Setor: %{customdata[0]}<br>Via: %{customdata[1]}<extra></extra>",
         ))
         _chart_layout(fig_top, "", height=max(len(df_top20) * 28, 400), y_suffix="%")
         fig_top.update_layout(xaxis_title="Exposicao (% PL)")
         st.plotly_chart(fig_top, width='stretch', key="exp_top20")
 
         # ── Sector aggregation ──
-        st.markdown('<div class="tag-section-title">Exposicao por Setor</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como ler:</b> Soma da exposicao a acoes agrupada por setor. Mostra o perfil setorial "
+        st.markdown('<div class="tag-section-title">Exposição por Setor</div>', unsafe_allow_html=True)
+        st.markdown(_legenda("<b>Como ler:</b> Soma da exposição a ações agrupada por setor. Mostra o perfil setorial "
             "real do fundo apos explodir todos os sub-fundos e ETFs. Compara com o IBOV para entender over/underweight."), unsafe_allow_html=True)
         df_sec = df_agg.groupby("setor").agg(
             exposicao_pct=("exposicao_pct", "sum"),
@@ -2180,9 +2180,9 @@ def render_tab_carteira_explodida():
             st.dataframe(df_sec_show.style.format({"Exposicao %": "{:.2f}", "N Ativos": "{:.0f}"}), hide_index=True, height=min(len(df_sec_show) * 38 + 45, 500))
 
         # ── Treemap by sector > stock ──
-        st.markdown('<div class="tag-section-title">Mapa — Exposicao por Setor e Ativo</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como ler:</b> Mapa proporcional onde o tamanho de cada retangulo = peso da acao na carteira. "
-            "Agrupado por setor. Clique num setor para expandir e ver as acoes individuais."), unsafe_allow_html=True)
+        st.markdown('<div class="tag-section-title">Mapa — Exposição por Setor e Ativo</div>', unsafe_allow_html=True)
+        st.markdown(_legenda("<b>Como ler:</b> Mapa proporcional onde o tamanho de cada retângulo = peso da ação na carteira. "
+            "Agrupado por setor. Clique num setor para expandir e ver as ações individuais."), unsafe_allow_html=True)
         df_tm = df_agg[df_agg["exposicao_pct"] > 0.05].head(60)
         if not df_tm.empty:
             sectors = df_tm["setor"].unique().tolist()
@@ -2199,9 +2199,9 @@ def render_tab_carteira_explodida():
 
         # ── Origin detail: which fund contributes what ──
         st.markdown('<div class="tag-section-title">Detalhe por Origem — Quanto cada sub-fundo/ETF contribui</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como ler:</b> Mostra quanto de exposicao a acoes vem de cada sub-fundo ou ETF. "
+        st.markdown(_legenda("<b>Como ler:</b> Mostra quanto de exposição a ações vem de cada sub-fundo ou ETF. "
             "Ex: 'Tarpon GT Institucional' contribui X% de exposicao total a acoes. "
-            "Fundos que aparecem como 'Direto' sao acoes compradas diretamente pelo Synta."), unsafe_allow_html=True)
+            "Fundos que aparecem como 'Direto' são ações compradas diretamente pelo Synta."), unsafe_allow_html=True)
         df_origin = df_eq.groupby("origem").agg(
             exposicao_pct=("exposicao_pct", "sum"),
             n_ativos=("ativo", "nunique"),
@@ -2218,8 +2218,8 @@ def render_tab_carteira_explodida():
         st.plotly_chart(fig_orig, width='stretch', key="exp_orig")
 
         # ── Interactive: Stock → Fund origins ──
-        st.markdown('<div class="tag-section-title">Explorar Acao — De onde vem a exposicao?</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como usar:</b> Selecione uma acao para ver por quais sub-fundos/ETFs o Synta tem exposicao a ela. "
+        st.markdown('<div class="tag-section-title">Explorar Ação — De onde vem a exposição?</div>', unsafe_allow_html=True)
+        st.markdown(_legenda("<b>Como usar:</b> Selecione uma ação para ver por quais sub-fundos/ETFs o Synta tem exposição a ela. "
             "Mostra o peso que cada via contribui, permitindo entender a concentracao e a diversificacao."), unsafe_allow_html=True)
         # Build per-stock origin data
         stock_list = sorted(df_agg["ativo"].tolist())
@@ -2235,24 +2235,24 @@ def render_tab_carteira_explodida():
                 ).reset_index().sort_values("exposicao_pct", ascending=False)
                 total_sel = df_sel_agg["exposicao_pct"].sum()
                 setor_sel = df_agg.loc[df_agg["ativo"] == sel_stock, "setor"].iloc[0] if sel_stock in df_agg["ativo"].values else ""
-                st.markdown(f"**{sel_stock}** — Setor: {setor_sel} — Exposicao total: **{total_sel:.3f}%** do PL")
+                st.markdown(f"**{sel_stock}** — Setor: {setor_sel} — Exposição total: **{total_sel:.3f}%** do PL")
                 fig_sel = go.Figure(go.Bar(
                     x=df_sel_agg["exposicao_pct"], y=df_sel_agg["origem"], orientation="h",
                     marker_color=[TAG_LARANJA if t != "Fundo>ETF" else TAG_CHART_COLORS[1] for t in df_sel_agg["tipo_origem"]],
                     text=[f"{v:.3f}% ({v/total_sel*100:.0f}%)" if total_sel > 0 else f"{v:.3f}%" for v in df_sel_agg["exposicao_pct"]],
                     textposition="outside", textfont=dict(size=10, color=TAG_OFFWHITE),
-                    hovertemplate="<b>%{y}</b><br>Exposicao: %{x:.3f}%<extra></extra>",
+                    hovertemplate="<b>%{y}</b><br>Exposição: %{x:.3f}%<extra></extra>",
                 ))
                 _chart_layout(fig_sel, "", height=max(len(df_sel_agg) * 35, 150))
                 fig_sel.update_layout(xaxis_title="Exposicao (% PL)", margin=dict(t=10, b=30, l=150, r=80))
                 st.plotly_chart(fig_sel, width='stretch', key="exp_sel_chart")
             else:
-                st.info("Selecione uma acao na lista ao lado.")
+                st.info("Selecione uma ação na lista ao lado.")
 
         # ── Interactive: Fund → Stocks held ──
-        st.markdown('<div class="tag-section-title">Explorar Fundo — Quais acoes ele carrega?</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como usar:</b> Selecione um sub-fundo/ETF para ver todas as acoes que ele carrega "
-            "e o quanto cada uma contribui para a exposicao do Synta. Util para entender a estrategia de cada gestor."), unsafe_allow_html=True)
+        st.markdown('<div class="tag-section-title">Explorar Fundo — Quais ações ele carrega?</div>', unsafe_allow_html=True)
+        st.markdown(_legenda("<b>Como usar:</b> Selecione um sub-fundo/ETF para ver todas as ações que ele carrega "
+            "e o quanto cada uma contribui para a exposição do Synta. Util para entender a estrategia de cada gestor."), unsafe_allow_html=True)
         origin_list = sorted(df_eq["origem"].unique().tolist())
         col_sel2, col_detail2 = st.columns([1, 3])
         with col_sel2:
@@ -2265,7 +2265,7 @@ def render_tab_carteira_explodida():
                 ).reset_index().sort_values("exposicao_pct", ascending=False)
                 total_sel2 = df_sel2_agg["exposicao_pct"].sum()
                 n_ativos_sel2 = len(df_sel2_agg)
-                st.markdown(f"**{sel_origin}** — {n_ativos_sel2} acoes — Exposicao total: **{total_sel2:.2f}%** do PL")
+                st.markdown(f"**{sel_origin}** — {n_ativos_sel2} ações — Exposição total: **{total_sel2:.2f}%** do PL")
                 df_show_sel2 = df_sel2_agg.head(20).sort_values("exposicao_pct")
                 fig_sel2 = go.Figure(go.Bar(
                     x=df_show_sel2["exposicao_pct"], y=df_show_sel2["ativo"], orientation="h",
@@ -2273,7 +2273,7 @@ def render_tab_carteira_explodida():
                     text=[f"{v:.3f}%" for v in df_show_sel2["exposicao_pct"]],
                     textposition="outside", textfont=dict(size=9, color=TAG_OFFWHITE),
                     customdata=df_show_sel2[["setor"]].values,
-                    hovertemplate="<b>%{y}</b> (%{customdata[0]})<br>Exposicao: %{x:.3f}%<extra></extra>",
+                    hovertemplate="<b>%{y}</b> (%{customdata[0]})<br>Exposição: %{x:.3f}%<extra></extra>",
                 ))
                 _chart_layout(fig_sel2, "", height=max(len(df_show_sel2) * 25, 200))
                 fig_sel2.update_layout(xaxis_title="Exposicao (% PL)", margin=dict(t=10, b=30, l=80, r=80))
@@ -2299,9 +2299,9 @@ def render_tab_carteira_explodida():
             df_not_exploded = df_not_exploded.groupby("ativo", as_index=False).agg({"exposicao_pct": "sum"})
             st.markdown(f"""<div style="background:{TAG_BG_CARD};border:1px solid {TAG_LARANJA}40;border-radius:8px;
                 padding:12px 16px;margin:10px 0;font-size:0.85rem;">
-                <span style="color:{TAG_LARANJA};font-weight:600;">Fundos nao explodidos</span><br>
-                <span style="color:{TEXT_MUTED};">Os fundos abaixo aparecem como posicao agregada porque nao temos dados de composicao
-                (CVM ou XML) disponiveis. Sua exposicao real a acoes individuais nao esta refletida nos graficos acima.</span><br><br>
+                <span style="color:{TAG_LARANJA};font-weight:600;">Fundos não explodidos</span><br>
+                <span style="color:{TEXT_MUTED};">Os fundos abaixo aparecem como posicao agregada porque não temos dados de composição
+                (CVM ou XML) disponíveis. Sua exposição real a ações individuais não esta refletida nos gráficos acima.</span><br><br>
                 {"".join(f"<span style='color:{TAG_OFFWHITE};'>• <b>{r['ativo']}</b> — {r['exposicao_pct']:.2f}% do PL</span><br>" for _, r in df_not_exploded.iterrows())}
                 </div>""", unsafe_allow_html=True)
 
@@ -2313,12 +2313,12 @@ def render_tab_carteira_explodida():
             st.dataframe(df_oth_show.style.format({"Peso %": "{:.2f}"}), hide_index=True)
 
     # ── Historical sector evolution (EXPLODED) ──
-    st.markdown('<div class="tag-section-title">Evolucao Historica da Composicao Setorial (Carteira Explodida)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tag-section-title">Evolução Histórica da Composição Setorial (Carteira Explodida)</div>', unsafe_allow_html=True)
     st.markdown(_legenda(
-        "<b>Como ler:</b> Area empilhada mostrando como a alocacao setorial <b>real</b> do fundo evoluiu ao longo do tempo. "
+        "<b>Como ler:</b> Área empilhada mostrando como a alocação setorial <b>real</b> do fundo evoluiu ao longo do tempo. "
         "Os sub-fundos sao explodidos em acoes individuais (via CVM) e agrupados por setor. "
-        "Mostra a exposicao real a cada setor da B3, nao apenas as classes genericas.<br>"
-        "<span style='color:#FF8853;'>⚠</span> Composicao dos sub-fundos via CVM (mensal, defasagem 3-6m). "
+        "Mostra a exposição real a cada setor da B3, não apenas as classes genericas.<br>"
+        "<span style='color:#FF8853;'>⚠</span> Composição dos sub-fundos via CVM (mensal, defasagem 3-6m). "
         "Os pesos dos componentes no fundo mudam diariamente (XML BNY Mellon)."), unsafe_allow_html=True)
 
     # Load time series for historical view
@@ -2424,8 +2424,8 @@ def render_tab_carteira_explodida():
             st.plotly_chart(fig_sec_hist, width='stretch', key="exp_hist_sector")
 
         # ── By broad class (original view) ──
-        st.markdown('<div class="tag-section-title">Evolucao por Classe (Fundos RV, RF, Caixa, Futuros)</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como ler:</b> Area empilhada mostrando a alocacao do fundo por classe generica "
+        st.markdown('<div class="tag-section-title">Evolução por Classe (Fundos RV, RF, Caixa, Futuros)</div>', unsafe_allow_html=True)
+        st.markdown(_legenda("<b>Como ler:</b> Área empilhada mostrando a alocação do fundo por classe genérica "
             "(Fundos RV = sub-fundos equity, Caixa, Renda Fixa, ETFs, Futuros). "
             "Baseado nos XMLs diarios do BNY Mellon."), unsafe_allow_html=True)
         df_hist["classe"] = df_hist.apply(lambda r: _classificar_componente(r["componente"], r["tipo"]), axis=1)
@@ -2438,10 +2438,10 @@ def render_tab_carteira_explodida():
         st.plotly_chart(fig_hist, width='stretch', key="exp_hist_classe")
 
         # Stacked area of ALL components over time
-        st.markdown('<div class="tag-section-title">Evolucao Historica dos Componentes da Carteira</div>', unsafe_allow_html=True)
-        st.markdown(_legenda("<b>Como ler:</b> Area empilhada mostrando o peso (% PL) de <b>todos</b> os componentes individuais do fundo ao longo do tempo. "
+        st.markdown('<div class="tag-section-title">Evolução Histórica dos Componentes da Carteira</div>', unsafe_allow_html=True)
+        st.markdown(_legenda("<b>Como ler:</b> Área empilhada mostrando o peso (% PL) de <b>todos</b> os componentes individuais do fundo ao longo do tempo. "
             "Os 12 maiores componentes sao exibidos individualmente; os demais sao agrupados em 'Outros'. "
-            "Util para acompanhar como a alocacao entre sub-fundos, acoes, caixa e RF evoluiu."), unsafe_allow_html=True)
+            "Util para acompanhar como a alocação entre sub-fundos, ações, caixa e RF evoluiu."), unsafe_allow_html=True)
         pivot_comp = df_hist.pivot_table(index="data", columns="componente", values="peso_pct", aggfunc="sum").fillna(0)
         avg_comp = pivot_comp.mean().sort_values(ascending=False)
         top_comp = avg_comp.head(12).index.tolist()
@@ -2464,7 +2464,7 @@ def render_tab_carteira_explodida():
         st.plotly_chart(fig_comp_hist, width='stretch', key="exp_hist_comp")
 
     st.markdown(f"""<div class="tag-disclaimer">
-        <b>Nota:</b> A explosao usa dados de composicao dos sub-fundos obtidos via CVM (mensal) e XMLs
+        <b>Nota:</b> A explosao usa dados de composição dos sub-fundos obtidos via CVM (mensal) e XMLs
         locais. ETFs sao decompostos usando a composicao atual do indice subjacente via API B3.
         Nem todos os sub-fundos tem dados de composicao disponiveis. Fundos sem dados aparecem como
         posicao agregada. BNY ARX Liquidez e classificado como Caixa.
@@ -2547,11 +2547,11 @@ def _fetch_fund_quotas(cnpjs: tuple, start: str, end: str) -> pd.DataFrame:
 def render_tab_desempenho_individual():
     st.markdown(f"""<div style="background:linear-gradient(135deg,{TAG_BG_CARD} 0%,{TAG_BG_CARD_ALT} 100%);
         border:1px solid {TAG_VERMELHO}30;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <span style="color:{TAG_LARANJA};font-weight:600;">O que e esta pagina?</span><br>
+        <span style="color:{TAG_LARANJA};font-weight:600;">O que é esta página?</span><br>
         <span style="color:{TAG_OFFWHITE};font-size:0.88rem;">
-        Compara o desempenho (retorno acumulado) dos <b>sub-fundos</b>, do <b>proprio Synta FIA / FIA II</b>,
-        e de <b>ativos diretos</b> (acoes/ETFs na carteira) contra o <b>IBOV</b>.<br>
-        <b>Metricas:</b> Retorno acumulado, volatilidade anualizada, Sharpe, max drawdown, beta vs IBOV, Ulcer Index.
+        Compara o desempenho (retorno acumulado) dos <b>sub-fundos</b>, do <b>próprio Synta FIA / FIA II</b>,
+        e de <b>ativos diretos</b> (ações/ETFs na carteira) contra o <b>IBOV</b>.<br>
+        <b>Métricas:</b> Retorno acumulado, volatilidade anualizada, Sharpe, max drawdown, beta vs IBOV, Ulcer Index.
         </span></div>""", unsafe_allow_html=True)
 
     dt_inicio, dt_fim = period_selector("desemp")
@@ -2563,7 +2563,7 @@ def render_tab_desempenho_individual():
     # ----- SECTION 1: Sub-fund performance vs IBOV -----
     st.markdown('<div class="tag-section-title">Retorno Acumulado dos Sub-Fundos vs IBOV</div>', unsafe_allow_html=True)
     st.markdown(_legenda("<b>Como ler:</b> Cada linha mostra o retorno acumulado de um sub-fundo investido pelo Synta. "
-        "As linhas <b>grossas</b> sao o <b>Synta FIA</b> e <b>Synta FIA II</b> (o fundo em si). "
+        "As linhas <b>grossas</b> são o <b>Synta FIA</b> e <b>Synta FIA II</b> (o fundo em si). "
         "A linha <b>tracejada branca</b> e o IBOV (benchmark). Sub-fundos acima do IBOV estao ganhando; abaixo, perdendo. "
         "Por padrao mostra todos os sub-fundos + IBOV. Use o seletor para filtrar."), unsafe_allow_html=True)
 
@@ -2625,7 +2625,7 @@ def render_tab_desempenho_individual():
                     direct_tickers.append(tk)
 
     if not subfund_cnpjs:
-        st.warning("Sem dados de sub-fundos para o periodo selecionado.")
+        st.warning("Sem dados de sub-fundos para o período selecionado.")
         return
 
     # Fetch fund quotas from CVM — sub-funds + Synta FIA + Synta FIA II
@@ -2694,7 +2694,7 @@ def render_tab_desempenho_individual():
         if not ts_df.empty:
             ts_df["data"] = pd.to_datetime(ts_df["data"])
             for tk in missing_tickers:
-                tk_data = ts_df[(ts_df["componente"] == tk) & (ts_df["tipo"] == "Acao/ETF")]
+                tk_data = ts_df[(ts_df["componente"] == tk) & (ts_df["tipo"] == "Ação/ETF")]
                 if tk_data.empty:
                     continue
                 tk_data = tk_data[["data", "pu"]].dropna(subset=["pu"])
@@ -2771,7 +2771,7 @@ def render_tab_desempenho_individual():
             fund_returns["IBOVESPA"] = ibov_cum
 
     if not fund_returns:
-        st.warning("Sem dados de cotas disponiveis para o periodo.")
+        st.warning("Sem dados de cotas disponíveis para o período.")
         return
 
     # Multiselect for funds to show — default to ALL current portfolio holdings + benchmarks
@@ -2833,13 +2833,13 @@ def render_tab_desempenho_individual():
     st.plotly_chart(fig_cum, width='stretch', key="desemp_cum")
 
     # ----- Metrics Table -----
-    st.markdown('<div class="tag-section-title">Metricas de Performance</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tag-section-title">Métricas de Performance</div>', unsafe_allow_html=True)
     st.markdown(_legenda(
-        "<b>Ret.Acum</b> = Retorno total no periodo. "
+        "<b>Ret.Acum</b> = Retorno total no período. "
         "<b>Vol.Anual</b> = Volatilidade anualizada (risco). "
         "<b>Sharpe</b> = Retorno / Risco (quanto maior, melhor). "
         "<b>Max DD</b> = Maior queda do pico ao vale (quanto menor em modulo, melhor). "
-        "<b>Beta</b> = Sensibilidade ao IBOV (>1 = mais volatil que IBOV). "
+        "<b>Beta</b> = Sensibilidade ao IBOV (>1 = mais volátil que IBOV). "
         "<b>Excesso</b> = Retorno acumulado - Retorno IBOV."), unsafe_allow_html=True)
 
     # Compute metrics
@@ -2904,7 +2904,7 @@ def render_tab_desempenho_individual():
 
     # ----- Drawdown chart -----
     st.markdown('<div class="tag-section-title">Drawdown</div>', unsafe_allow_html=True)
-    st.markdown(_legenda("<b>Como ler:</b> Mostra a queda percentual de cada fundo/ativo em relacao ao seu pico anterior. "
+    st.markdown(_legenda("<b>Como ler:</b> Mostra a queda percentual de cada fundo/ativo em relação ao seu pico anterior. "
         "Quanto mais profundo o vale, maior a perda temporaria. Um bom fundo recupera rapido (vale raso e curto)."), unsafe_allow_html=True)
     fig_dd = go.Figure()
     color_idx = 0
@@ -2943,10 +2943,10 @@ def render_tab_desempenho_individual():
     # ----- SECTION 2: Scatter Risk vs Return -----
     st.markdown('<div class="tag-section-title">Risco x Retorno</div>', unsafe_allow_html=True)
     st.markdown(_legenda(
-        "<b>Como ler:</b> Cada ponto = um sub-fundo ou o proprio Synta. "
+        "<b>Como ler:</b> Cada ponto = um sub-fundo ou o próprio Synta. "
         "<b>Eixo X</b> = Volatilidade anualizada (risco). <b>Eixo Y</b> = Retorno acumulado. "
         "O ideal e estar no <b>canto superior esquerdo</b> (alto retorno, baixo risco). "
-        "O IBOV aparece como referencia."), unsafe_allow_html=True)
+        "O IBOV aparece como referência."), unsafe_allow_html=True)
 
     if metrics_rows:
         df_scatter = pd.DataFrame(metrics_rows)
@@ -3041,7 +3041,7 @@ def render_tab_desempenho_individual():
     st.markdown("---")
     st.markdown('<div class="tag-section-title">Analise Rolling (Janela Movel)</div>', unsafe_allow_html=True)
     st.markdown(_legenda(
-        "<b>Como ler:</b> Graficos de janela movel mostram como as metricas evoluem ao longo do tempo. "
+        "<b>Como ler:</b> Gráficos de janela móvel mostram como as métricas evoluem ao longo do tempo. "
         "Util para identificar mudancas de regime — um fundo que era defensivo e ficou agressivo, ou vice-versa. "
         "Selecione a janela em dias uteis (63 ≈ 3 meses, 126 ≈ 6 meses, 252 ≈ 1 ano)."), unsafe_allow_html=True)
 
@@ -3077,7 +3077,7 @@ def render_tab_desempenho_individual():
         # ── Rolling Beta vs IBOV ──
         st.markdown(f'<div class="tag-section-title">Rolling Beta vs IBOV ({janela_du}du)</div>', unsafe_allow_html=True)
         st.markdown(_legenda(
-            "<b>Beta</b> mede a sensibilidade ao IBOV. Beta > 1 = mais volatil que o indice; Beta < 1 = mais defensivo. "
+            "<b>Beta</b> mede a sensibilidade ao IBOV. Beta > 1 = mais volátil que o índice; Beta < 1 = mais defensivo. "
             "A linha tracejada em 1.0 indica beta neutro."), unsafe_allow_html=True)
         fig_rbeta = go.Figure()
         color_counter_beta = [0]
@@ -3113,7 +3113,7 @@ def render_tab_desempenho_individual():
         # ── Rolling Sharpe ──
         st.markdown(f'<div class="tag-section-title">Rolling Sharpe ({janela_du}du)</div>', unsafe_allow_html=True)
         st.markdown(_legenda(
-            "<b>Sharpe</b> = retorno ajustado ao risco na janela movel. Quanto maior, melhor. "
+            "<b>Sharpe</b> = retorno ajustado ao risco na janela móvel. Quanto maior, melhor. "
             "Sharpe > 1 e considerado bom; > 2 e excelente."), unsafe_allow_html=True)
         fig_rsharpe = go.Figure()
         color_counter_sharpe = [0]
@@ -3153,7 +3153,7 @@ def render_tab_desempenho_individual():
         st.markdown(f'<div class="tag-section-title">Rolling Tracking Error vs IBOV ({janela_du}du)</div>', unsafe_allow_html=True)
         st.markdown(_legenda(
             "<b>Tracking Error</b> = volatilidade do retorno ativo (fundo - IBOV). "
-            "Quanto menor, mais o fundo acompanha o indice. TE alto = gestao ativa ou desvio significativo."), unsafe_allow_html=True)
+            "Quanto menor, mais o fundo acompanha o índice. TE alto = gestao ativa ou desvio significativo."), unsafe_allow_html=True)
         fig_rte = go.Figure()
         color_counter_te = [0]
         for name in selected_funds:
@@ -3184,7 +3184,7 @@ def render_tab_desempenho_individual():
 
     # ----- SECTION 4: Metricas Avancadas -----
     st.markdown("---")
-    st.markdown('<div class="tag-section-title">Metricas Avancadas de Risco</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tag-section-title">Métricas Avancadas de Risco</div>', unsafe_allow_html=True)
     st.markdown(_legenda(
         "<b>Sortino</b> = Sharpe ajustado (so penaliza downside). "
         "<b>VaR 95%</b> = perda maxima esperada em 95% dos dias. "
