@@ -1,5 +1,5 @@
 """
-Atribuicao de Performance — IBOV + Synta FIA / FIA II
+Atribuição de Performance — IBOV + Synta FIA / FIA II
 TAG Investimentos
 """
 import streamlit as st
@@ -15,7 +15,7 @@ from collections import defaultdict
 # CONFIG
 # ==============================================================================
 st.set_page_config(
-    page_title="Atribuicao de Performance - TAG Investimentos",
+    page_title="Atribuição de Performance - TAG Investimentos",
     page_icon="https://taginvest.com.br/favicon.ico",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -160,17 +160,17 @@ with st.sidebar:
             <img src='data:image/png;base64,{_logo_b64}' style='width:160px; height:auto; margin-bottom:6px;'/>
             <div style='width:40px; height:2px; background:{TAG_LARANJA}; margin:6px auto 0;'></div>
             <div style='font-size:0.75rem; color:{TAG_LARANJA}; margin-top:8px; font-weight:500;'>
-            Atribuicao de Performance</div></div>""", unsafe_allow_html=True)
+            Atribuição de Performance</div></div>""", unsafe_allow_html=True)
     else:
         st.markdown(f"""<div style='text-align:center; padding: 8px 0 16px 0;'>
             <div style='font-size:1.5rem; font-weight:700; color:{TAG_OFFWHITE};'>TAG</div>
             <div style='font-size:0.7rem; text-transform:uppercase; letter-spacing:0.15em; color:{TEXT_MUTED}; margin-top:-4px;'>Investimentos</div>
             <div style='width:40px; height:2px; background:{TAG_LARANJA}; margin:10px auto 0;'></div>
             <div style='font-size:0.75rem; color:{TAG_LARANJA}; margin-top:8px; font-weight:500;'>
-            Atribuicao de Performance</div></div>""", unsafe_allow_html=True)
+            Atribuição de Performance</div></div>""", unsafe_allow_html=True)
     st.divider()
-    page_sel = st.radio("Navegacao", [
-        "📊 Atribuicao IBOV",
+    page_sel = st.radio("Navegação", [
+        "📊 Atribuição IBOV",
         "📈 Synta FIA / FIA II",
         "🔬 Brinson-Fachler",
         "⚖️ Comparativo Fundos vs IBOV",
@@ -178,8 +178,8 @@ with st.sidebar:
         "📉 Desempenho Individual",
     ], label_visibility="collapsed")
     st.divider()
-    st.caption("Fonte precos: Yahoo Finance")
-    st.caption("Composicao IBOV: API B3")
+    st.caption("Fonte preços: Yahoo Finance")
+    st.caption("Composição IBOV: API B3")
     st.caption("Posicoes: XML BNY Mellon + CVM")
     st.caption(f"Atualizado: {date.today().strftime('%d/%m/%Y')}")
 
@@ -1323,12 +1323,12 @@ def render_tab_ibov():
         Mostra a <b>atribuicao de performance do IBOV</b>: quanto cada setor e cada ação
         contribuiu para o retorno total do índice no período selecionado.<br>
         <b>Contribuição</b> = Peso da ação no índice x Retorno da ação, calculada <b>diariamente</b>
-        e depois acumulada no periodo. A soma de todas = retorno do IBOV.
+        e depois acumulada no período. A soma de todas = retorno do IBOV.
         </span></div>""", unsafe_allow_html=True)
     dt_inicio, dt_fim = period_selector("ibov")
     composition = fetch_ibov_composition()
     if not composition:
-        st.error("Nao foi possivel obter a composição do IBOV via B3 API.")
+        st.error("Não foi possível obter a composição do IBOV via B3 API.")
         return
     tickers_sa = tuple(sorted(f"{tk}.SA" for tk in composition.keys()))
     # Buscar precos a partir de ~5 dias antes do inicio para garantir que temos
@@ -1338,7 +1338,7 @@ def render_tab_ibov():
     end_str = (dt_fim + timedelta(days=1)).strftime("%Y-%m-%d")
     df_prices = fetch_prices(tickers_sa, start_fetch, end_str)
     if df_prices.empty:
-        st.error("Nao foi possivel baixar precos historicos.")
+        st.error("Não foi possível baixar preços históricos.")
         return
     # Filtrar para incluir apenas: ultimo dia ANTES de dt_inicio + todos os dias do periodo
     ibov_all = df_prices["^BVSP"].dropna()
@@ -1668,7 +1668,7 @@ def render_tab_brinson():
     ret_fundo = df_fund_attr["retorno_total_fundo"].iloc[0]
     composition = fetch_ibov_composition()
     if not composition:
-        st.error("Composição IBOV indisponivel.")
+        st.error("Composição IBOV indisponível.")
         return
     tickers_sa = tuple(sorted(f"{tk}.SA" for tk in composition.keys()))
     start_fetch = (dt_inicio - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -1991,7 +1991,7 @@ def render_tab_comparativo():
         return
     composition = fetch_ibov_composition()
     if not composition:
-        st.error("Composição IBOV indisponivel.")
+        st.error("Composição IBOV indisponível.")
         return
     tickers_sa = tuple(sorted(f"{tk}.SA" for tk in composition.keys()))
     start_fetch = (dt_inicio - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -3313,15 +3313,15 @@ def render_tab_desempenho_individual():
 def main():
     # Dynamic page title per tab
     _page_titles = {
-        "📊 Atribuicao IBOV": "Atribuicao de Performance — IBOV",
-        "📈 Synta FIA / FIA II": "Atribuicao por Componente — Synta",
-        "🔬 Brinson-Fachler": "Analise Brinson-Fachler",
+        "📊 Atribuição IBOV": "Atribuição de Performance — IBOV",
+        "📈 Synta FIA / FIA II": "Atribuição por Componente — Synta",
+        "🔬 Brinson-Fachler": "Análise Brinson-Fachler",
         "⚖️ Comparativo Fundos vs IBOV": "Comparativo de Fundos",
         "🔍 Carteira Explodida por Ativo": "Carteira Explodida — Look-Through",
         "📉 Desempenho Individual": "Desempenho Individual — Fundos e Ativos",
     }
     st.markdown(f"# {_page_titles.get(page_sel, 'Monitoramento de Carteira')}")
-    if page_sel == "📊 Atribuicao IBOV":
+    if page_sel == "📊 Atribuição IBOV":
         render_tab_ibov()
     elif page_sel == "📈 Synta FIA / FIA II":
         render_tab_synta()
