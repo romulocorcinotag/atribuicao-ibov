@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 # === Paths ===
 XML_BASE = r"G:\Drives compartilhados\SisIntegra\AMBIENTE_PRODUCAO\Posicao_XML\Mellon"
 CARTEIRA_RV_DATA = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\data"
+CARTEIRA_RV_CACHE = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\cache"
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 # === Fund config (same as app.py) ===
@@ -48,6 +49,26 @@ SUBFUNDO_NAMES = {
     # --- Synta funds themselves ---
     "51564188000131": "Synta FIA II",
     "20214858000166": "Synta FIA",
+}
+
+# Master CNPJ mapping (feeder -> master, same as app.py)
+MASTER_CNPJ_MAP = {
+    "15578434000140": "17162816000114",   # Atmos Institucional -> Atmos Master
+    "28408121000196": "09143435000160",   # GTI Haifa FIA -> GTI Dimona Master
+    "11961199000130": "20889133000178",   # Neo Navitas FIC -> Neo Navitas Master
+    "42831345000137": "32812291000109",   # NV FC FIA -> Navi Institucional Master FIF
+    "17157131000180": "27227810000131",   # Oceana Selection -> Oceana Selection Master
+    "26956042000194": "18454944000102",   # Oceana Valor 30 -> Oceana Valor Master
+    "49984812000108": "38251507000190",   # Organon Institucional -> Organon Master FIA
+    "13455174000190": "13455136000138",   # Santander Dividendos CIC -> Santander Div FI
+    "17898543000170": None,               # BNY ARX Liquidez RF -> RF, nao explode
+    "16565084000140": "16565084000140",   # SPX Apache FIA -> ele mesmo
+    "53827819000193": "51752977000104",   # Absolute Pace FIC FIM -> Absolute Pace Master FIF MM
+    "51427627000164": "17162816000114",   # Atmos Institucional S -> Atmos Master (mesmo)
+    "52070019000108": "52070476000100",   # Real Investor FIC -> Real Investor Master
+    "40226121000170": "39344972000139",   # Perfin Infra Equity FIC -> Perfin Infra Master
+    "41632880000104": "15831948000166",   # SPX Falcon Inst -> SPX Falcon Master
+    "39346123000114": "27389566000103",   # Tarpon GT Institucional -> Tarpon GT Master
 }
 
 
@@ -218,18 +239,166 @@ def export_synta_timeseries(since_date=None):
 
 
 def copy_subfund_positions():
-    """Copy posicoes_consolidado.parquet from carteira_rv if available."""
-    src = os.path.join(CARTEIRA_RV_DATA, "posicoes_consolidado.parquet")
-    dst = os.path.join(DATA_DIR, "posicoes_consolidado.parquet")
-    if os.path.exists(src):
-        shutil.copy2(src, dst)
-        size = os.path.getsize(dst) / 1024
-        print(f"\n=== Copiado posicoes_consolidado.parquet ({size:.0f} KB) ===")
+    """Copy posicoes_consolidado, posicoes_xml and posicoes_cvm from carteira_rv."""
+    for fname in ["posicoes_consolidado.parquet", "posicoes_xml.parquet", "posicoes_cvm.parquet"]:
+        src = os.path.join(CARTEIRA_RV_DATA, fname)
+        dst = os.path.join(DATA_DIR, fname)
+        if os.path.exists(src):
+            shutil.copy2(src, dst)
+            size = os.path.getsize(dst) / 1024
+            print(f"\n=== Copiado {fname} ({size:.0f} KB) ===")
+        else:
+            print(f"\n  {fname} nao encontrado em {CARTEIRA_RV_DATA}")
+
+
+def supplement_blc4_positions():
+    """Extract BLC4 positions for master CNPJs missing from posicoes_cvm.
+
+    Some funds (e.g. Organon, Absolute Pace) are only available in CVM BLC4
+    cache files, not in posicoes_cvm.parquet. This function extracts their
+    stock positions from the BLC4 cache and appends to the deployed posicoes_cvm.
+    """
+    cache_dir = CARTEIRA_RV_CACHE
+    if not os.path.isdir(cache_dir):
+        print(f"\n  BLC4 cache nao encontrado: {cache_dir}")
+        return
+
+    # Load existing cvm data to find which masters are already covered
+    cvm_path = os.path.join(DATA_DIR, "posicoes_cvm.parquet")
+    existing_masters = set()
+    if os.path.exists(cvm_path):
+        df_cvm = pd.read_parquet(cvm_path)
+        existing_masters = set(df_cvm["cnpj_fundo"].unique())
+
+    # Find master CNPJs that are missing
+    needed = {}  # master_cnpj -> [feeder_cnpj, ...]
+    for feeder, master in MASTER_CNPJ_MAP.items():
+        if master is None:
+            continue
+        # Check if master is in existing data
+        if master in existing_masters:
+            continue
+        needed.setdefault(master, []).append(feeder)
+
+    if not needed:
+        print("\n  Todos os masters ja estao em posicoes_cvm.parquet")
+        return
+
+    print(f"\n=== Suplementando com BLC4 para {len(needed)} masters faltantes ===")
+    for m, feeders in needed.items():
+        feeder_names = [SUBFUNDO_NAMES.get(f, f) for f in feeders]
+        print(f"  {m} -> {', '.join(feeder_names)}")
+
+    # Format master CNPJs for matching
+    def _fmt(c):
+        c = c.zfill(14)
+        return f"{c[:2]}.{c[2:5]}.{c[5:8]}/{c[8:12]}-{c[12:14]}"
+
+    master_formatted = {_fmt(m): m for m in needed.keys()}
+
+    blc4_files = sorted(glob.glob(os.path.join(cache_dir, "cvm_blc4_*.parquet")), reverse=True)
+    if not blc4_files:
+        print("  Nenhum arquivo BLC4 encontrado")
+        return
+
+    # Also load PL data
+    pl_data = {}
+    rows = []
+    found_masters = set()
+
+    for blc4_file in blc4_files:
+        if len(found_masters) == len(needed):
+            break
+
+        try:
+            df_blc = pd.read_parquet(blc4_file)
+        except Exception:
+            continue
+
+        cnpj_col = "CNPJ_FUNDO_CLASSE" if "CNPJ_FUNDO_CLASSE" in df_blc.columns else "CNPJ_FUNDO"
+        if "TP_APLIC" not in df_blc.columns or "CD_ATIVO" not in df_blc.columns:
+            continue
+
+        mask_stocks = df_blc["TP_APLIC"].str.contains(
+            r"(?:A.{1,3}es|Brazilian Depository)", case=False, na=False
+        )
+        mask_value = df_blc["VL_MERC_POS_FINAL"].fillna(0) > 0
+        df_stocks = df_blc[mask_stocks & mask_value].copy()
+        if df_stocks.empty:
+            continue
+
+        fname = os.path.basename(blc4_file)
+        month_str = fname.replace("cvm_blc4_", "").replace(".parquet", "")
+        try:
+            ref_date = pd.Timestamp(f"{month_str[:4]}-{month_str[4:6]}-28")
+        except Exception:
+            continue
+
+        # Load PL
+        pl_file = os.path.join(cache_dir, f"cvm_pl_{month_str}.parquet")
+        if os.path.exists(pl_file) and month_str not in pl_data:
+            try:
+                df_pl = pd.read_parquet(pl_file)
+                pl_cnpj_col = "CNPJ_FUNDO_CLASSE" if "CNPJ_FUNDO_CLASSE" in df_pl.columns else "CNPJ_FUNDO"
+                for _, row in df_pl.iterrows():
+                    cnpj_val = str(row.get(pl_cnpj_col, ""))
+                    vl_pl = row.get("VL_PATRIM_LIQ", 0)
+                    if cnpj_val and vl_pl and vl_pl > 0:
+                        pl_data[(cnpj_val, month_str)] = vl_pl
+            except Exception:
+                pass
+
+        for fmt_cnpj, raw_master in master_formatted.items():
+            if raw_master in found_masters:
+                continue
+
+            df_fund = df_stocks[df_stocks[cnpj_col] == fmt_cnpj]
+            if df_fund.empty:
+                continue
+
+            found_masters.add(raw_master)
+            fund_pl = pl_data.get((fmt_cnpj, month_str), 0)
+            if fund_pl <= 0:
+                fund_pl = df_fund["VL_MERC_POS_FINAL"].sum() * 1.05
+
+            for _, row in df_fund.iterrows():
+                ticker = str(row.get("CD_ATIVO", "")).strip()
+                valor = float(row.get("VL_MERC_POS_FINAL", 0))
+                if not ticker or valor <= 0:
+                    continue
+                pct = (valor / fund_pl * 100) if fund_pl > 0 else 0
+                rows.append({
+                    "cnpj_fundo": raw_master,
+                    "data": ref_date,
+                    "ativo": ticker,
+                    "valor": valor,
+                    "pl": fund_pl,
+                    "pct_pl": pct,
+                    "setor": "",
+                    "fonte": "CVM_BLC4",
+                })
+
+    if not rows:
+        print("  Nenhum dado BLC4 encontrado para masters faltantes")
+        return
+
+    df_supplement = pd.DataFrame(rows)
+    print(f"  Extraidos {len(df_supplement)} registros de BLC4")
+    for m in found_masters:
+        n = len(df_supplement[df_supplement["cnpj_fundo"] == m])
+        print(f"    {m}: {n} holdings")
+
+    # Append to posicoes_cvm.parquet
+    if os.path.exists(cvm_path):
+        df_existing = pd.read_parquet(cvm_path)
+        df_combined = pd.concat([df_existing, df_supplement], ignore_index=True)
     else:
-        print(f"\n⚠ posicoes_consolidado.parquet nao encontrado em {CARTEIRA_RV_DATA}")
+        df_combined = df_supplement
 
+    df_combined.to_parquet(cvm_path, index=False)
+    size = os.path.getsize(cvm_path) / 1024
+    print(f"  posicoes_cvm.parquet atualizado: {size:.0f} KB ({len(df_combined)} rows)")
 
-CARTEIRA_RV_CACHE = r"G:\Drives compartilhados\Gestao_AI\carteira_rv\cache"
 
 # All CNPJs we need quotas for (sub-funds + Synta FIA + FIA II)
 ALL_SUBFUND_CNPJS = list(SUBFUNDO_NAMES.keys())
@@ -331,6 +500,7 @@ def main():
 
     export_synta_timeseries(since_date)
     copy_subfund_positions()
+    supplement_blc4_positions()
     export_fund_quotas()
 
     print("\nExportacao concluida!")

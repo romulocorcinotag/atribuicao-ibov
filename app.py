@@ -470,12 +470,39 @@ def load_subfund_positions() -> pd.DataFrame:
     """Load sub-fund stock positions from multiple sources, keeping most recent per fund.
 
     Priority order (all are checked, most recent date wins per fund):
-      1. posicoes_consolidado.parquet (pre-merged XML+CVM data with feeder CNPJs)
-      2. posicoes_xml.parquet (BNY Mellon XMLs — may have newer data, uses master CNPJs)
+      1. posicoes_consolidado.parquet (pre-merged XML+CVM data — may use master CNPJs)
+      2. posicoes_xml.parquet (BNY Mellon XMLs — uses master CNPJs)
       3. posicoes_cvm.parquet (CVM downloads — uses master CNPJs)
       4. CVM BLC_4 cache parquets (oldest fallback)
+
+    All sources apply master→feeder CNPJ remapping via MASTER_CNPJ_MAP.
     """
     frames = []
+
+    # Build master→feeder mapping (used by all sources)
+    master_to_feeders = {}  # master_cnpj -> [feeder_cnpj, ...]
+    for feeder, master in MASTER_CNPJ_MAP.items():
+        if master and master != feeder:
+            master_to_feeders.setdefault(master, []).append(feeder)
+
+    def _remap_master_to_feeder(df_src):
+        """Create copies of master-CNPJ rows with feeder CNPJs."""
+        remapped = []
+        for master_cnpj, feeders in master_to_feeders.items():
+            master_data = df_src[df_src["cnpj_fundo"] == master_cnpj]
+            if master_data.empty:
+                continue
+            for feeder_cnpj in feeders:
+                df_copy = master_data.copy()
+                df_copy["cnpj_fundo"] = feeder_cnpj
+                remapped.append(df_copy)
+        # Self-mapped entries (feeder == master, e.g. SPX Apache)
+        for feeder, master in MASTER_CNPJ_MAP.items():
+            if master == feeder:
+                direct = df_src[df_src["cnpj_fundo"] == feeder]
+                if not direct.empty:
+                    remapped.append(direct)
+        return remapped
 
     # --- Source 1: posicoes_consolidado.parquet ---
     parquet_path = os.path.join(CARTEIRA_RV_DATA, "posicoes_consolidado.parquet")
@@ -487,16 +514,16 @@ def load_subfund_positions() -> pd.DataFrame:
         if "setor" in df.columns:
             df["setor"] = df["ativo"].apply(classificar_setor)
         frames.append(df)
+        # Remap master→feeder in consolidado (it may contain master CNPJs)
+        remapped = _remap_master_to_feeder(df)
+        if remapped:
+            frames.append(pd.concat(remapped, ignore_index=True))
 
     # --- Source 2 & 3: posicoes_xml.parquet and posicoes_cvm.parquet ---
-    # These use MASTER CNPJs — remap to feeder CNPJs via MASTER_CNPJ_MAP
-    master_to_feeders = {}  # master_cnpj -> [feeder_cnpj, ...]
-    for feeder, master in MASTER_CNPJ_MAP.items():
-        if master and master != feeder:
-            master_to_feeders.setdefault(master, []).append(feeder)
-
     for extra_file in ["posicoes_xml.parquet", "posicoes_cvm.parquet"]:
         extra_path = os.path.join(CARTEIRA_RV_DATA, extra_file)
+        if not os.path.exists(extra_path):
+            extra_path = os.path.join(DATA_DIR, extra_file)  # Cloud fallback
         if not os.path.exists(extra_path):
             continue
         try:
@@ -505,23 +532,9 @@ def load_subfund_positions() -> pd.DataFrame:
             if "setor" in df_extra.columns:
                 df_extra["setor"] = df_extra["ativo"].apply(classificar_setor)
             # Remap master CNPJs to feeder CNPJs
-            remapped_rows = []
-            for master_cnpj, feeders in master_to_feeders.items():
-                master_data = df_extra[df_extra["cnpj_fundo"] == master_cnpj]
-                if master_data.empty:
-                    continue
-                for feeder_cnpj in feeders:
-                    df_copy = master_data.copy()
-                    df_copy["cnpj_fundo"] = feeder_cnpj
-                    remapped_rows.append(df_copy)
-            # Also keep rows where cnpj_fundo is already a feeder (self-mapped like SPX Apache)
-            for feeder, master in MASTER_CNPJ_MAP.items():
-                if master == feeder:
-                    direct = df_extra[df_extra["cnpj_fundo"] == feeder]
-                    if not direct.empty:
-                        remapped_rows.append(direct)
-            if remapped_rows:
-                frames.append(pd.concat(remapped_rows, ignore_index=True))
+            remapped = _remap_master_to_feeder(df_extra)
+            if remapped:
+                frames.append(pd.concat(remapped, ignore_index=True))
         except Exception:
             pass
 
@@ -559,6 +572,30 @@ def load_subfund_positions_all() -> pd.DataFrame:
     """
     frames = []
 
+    # Build master→feeder mapping (used by all sources)
+    master_to_feeders = {}
+    for feeder, master in MASTER_CNPJ_MAP.items():
+        if master and master != feeder:
+            master_to_feeders.setdefault(master, []).append(feeder)
+
+    def _remap(df_src):
+        """Create copies of master-CNPJ rows with feeder CNPJs."""
+        remapped = []
+        for master_cnpj, feeders in master_to_feeders.items():
+            master_data = df_src[df_src["cnpj_fundo"] == master_cnpj]
+            if master_data.empty:
+                continue
+            for feeder_cnpj in feeders:
+                df_copy = master_data.copy()
+                df_copy["cnpj_fundo"] = feeder_cnpj
+                remapped.append(df_copy)
+        for feeder, master in MASTER_CNPJ_MAP.items():
+            if master == feeder:
+                direct = df_src[df_src["cnpj_fundo"] == feeder]
+                if not direct.empty:
+                    remapped.append(direct)
+        return remapped
+
     # --- Source 1: posicoes_consolidado.parquet ---
     parquet_path = os.path.join(CARTEIRA_RV_DATA, "posicoes_consolidado.parquet")
     if not os.path.exists(parquet_path):
@@ -569,15 +606,16 @@ def load_subfund_positions_all() -> pd.DataFrame:
         if "setor" in df.columns:
             df["setor"] = df["ativo"].apply(classificar_setor)
         frames.append(df)
+        # Remap master→feeder in consolidado too
+        remapped = _remap(df)
+        if remapped:
+            frames.append(pd.concat(remapped, ignore_index=True))
 
     # --- Source 2 & 3: posicoes_xml.parquet and posicoes_cvm.parquet ---
-    master_to_feeders = {}
-    for feeder, master in MASTER_CNPJ_MAP.items():
-        if master and master != feeder:
-            master_to_feeders.setdefault(master, []).append(feeder)
-
     for extra_file in ["posicoes_xml.parquet", "posicoes_cvm.parquet"]:
         extra_path = os.path.join(CARTEIRA_RV_DATA, extra_file)
+        if not os.path.exists(extra_path):
+            extra_path = os.path.join(DATA_DIR, extra_file)  # Cloud fallback
         if not os.path.exists(extra_path):
             continue
         try:
@@ -585,22 +623,9 @@ def load_subfund_positions_all() -> pd.DataFrame:
             df_extra["data"] = pd.to_datetime(df_extra["data"])
             if "setor" in df_extra.columns:
                 df_extra["setor"] = df_extra["ativo"].apply(classificar_setor)
-            remapped_rows = []
-            for master_cnpj, feeders in master_to_feeders.items():
-                master_data = df_extra[df_extra["cnpj_fundo"] == master_cnpj]
-                if master_data.empty:
-                    continue
-                for feeder_cnpj in feeders:
-                    df_copy = master_data.copy()
-                    df_copy["cnpj_fundo"] = feeder_cnpj
-                    remapped_rows.append(df_copy)
-            for feeder, master in MASTER_CNPJ_MAP.items():
-                if master == feeder:
-                    direct = df_extra[df_extra["cnpj_fundo"] == feeder]
-                    if not direct.empty:
-                        remapped_rows.append(direct)
-            if remapped_rows:
-                frames.append(pd.concat(remapped_rows, ignore_index=True))
+            remapped = _remap(df_extra)
+            if remapped:
+                frames.append(pd.concat(remapped, ignore_index=True))
         except Exception:
             pass
 
