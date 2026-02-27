@@ -21,6 +21,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── SSO Authentication Guard ──
+from sso_auth import require_sso
+sso_user = require_sso()
+
 # ==============================================================================
 # PATHS
 # ==============================================================================
