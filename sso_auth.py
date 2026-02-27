@@ -31,19 +31,6 @@ _TAG_BG_CARD = "#2A1520"
 _TAG_BG_CARD_ALT = "#321A28"
 _TAG_TEXT_MUTED = "#9A9590"
 
-# ── SVG lock/shield icon (inline, no external deps) ──
-_SHIELD_SVG = """
-<svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M12 2L4 5.5V11.5C4 16.45 7.4 21.05 12 22C16.6 21.05 20 16.45 20 11.5V5.5L12 2Z"
-        stroke="#FF8853" stroke-width="1.5" fill="rgba(255,136,83,0.08)"/>
-  <rect x="9.5" y="10" width="5" height="4.5" rx="0.8"
-        stroke="#FF8853" stroke-width="1.3" fill="none"/>
-  <path d="M10.5 10V8.5C10.5 7.67 11.17 7 12 7C12.83 7 13.5 7.67 13.5 8.5V10"
-        stroke="#FF8853" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-  <circle cx="12" cy="12" r="0.6" fill="#FF8853"/>
-</svg>
-"""
-
 
 def validate_sso_token() -> dict | None:
     """
@@ -69,13 +56,14 @@ def validate_sso_token() -> dict | None:
 
 def render_access_denied():
     """Render a branded 'Acesso Negado' page and stop execution."""
+
+    # ── CSS styles ──
     st.markdown(f"""
     <style>
-        /* ── Hide sidebar ── */
         [data-testid="stSidebar"] {{ display: none !important; }}
         [data-testid="stSidebarCollapsedControl"] {{ display: none !important; }}
-
-        /* ── Center entire page ── */
+        header[data-testid="stHeader"] {{ background: transparent; }}
+        #MainMenu {{ visibility: hidden; }}
         [data-testid="stMainBlockContainer"] {{
             max-width: 460px;
             margin: 0 auto;
@@ -83,8 +71,6 @@ def render_access_denied():
         [data-testid="stMainBlockContainer"] > div {{
             padding-top: 1rem;
         }}
-
-        /* ── Logo ── */
         .sso-logo {{
             text-align: center;
             margin: 36px 0 24px 0;
@@ -104,8 +90,6 @@ def render_access_denied():
             text-transform: uppercase;
             margin-top: 2px;
         }}
-
-        /* ── Card ── */
         .sso-card {{
             max-width: 400px;
             margin: 0 auto;
@@ -116,8 +100,6 @@ def render_access_denied():
             box-shadow: 0 8px 32px rgba(99,13,36,0.25);
             text-align: center;
         }}
-
-        /* ── Icon ── */
         .sso-icon {{
             margin-bottom: 20px;
             display: flex;
@@ -126,8 +108,6 @@ def render_access_denied():
         .sso-icon svg {{
             filter: drop-shadow(0 2px 8px rgba(255,136,83,0.2));
         }}
-
-        /* ── Title ── */
         .sso-title {{
             color: {_TAG_OFFWHITE};
             font-size: 1.4rem;
@@ -135,8 +115,6 @@ def render_access_denied():
             margin-bottom: 12px;
             letter-spacing: 0.02em;
         }}
-
-        /* ── Divider ── */
         .sso-divider {{
             width: 48px;
             height: 2px;
@@ -144,43 +122,16 @@ def render_access_denied():
             margin: 0 auto 16px auto;
             border-radius: 1px;
         }}
-
-        /* ── Message ── */
         .sso-msg {{
             color: {_TAG_TEXT_MUTED};
             font-size: 0.88rem;
             line-height: 1.65;
-            margin-bottom: 28px;
+            margin-bottom: 8px;
         }}
         .sso-msg strong {{
             color: {_TAG_OFFWHITE};
             font-weight: 600;
         }}
-
-        /* ── Button ── */
-        .sso-btn {{
-            display: inline-block;
-            width: 100%;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, {_TAG_LARANJA} 0%, #E06B35 100%);
-            color: #FFFFFF !important;
-            font-size: 0.92rem;
-            font-weight: 600;
-            text-decoration: none !important;
-            border-radius: 10px;
-            transition: all 0.25s ease;
-            box-shadow: 0 4px 16px rgba(255,136,83,0.3);
-            letter-spacing: 0.02em;
-            box-sizing: border-box;
-        }}
-        .sso-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(255,136,83,0.45);
-            background: linear-gradient(135deg, #FF9A6C 0%, {_TAG_LARANJA} 100%);
-            color: #FFFFFF !important;
-        }}
-
-        /* ── Footer ── */
         .sso-footer {{
             text-align: center;
             color: {_TAG_TEXT_MUTED};
@@ -188,36 +139,57 @@ def render_access_denied():
             margin-top: 28px;
             opacity: 0.5;
         }}
-
-        /* ── Hide Streamlit elements ── */
-        header[data-testid="stHeader"] {{ background: transparent; }}
-        #MainMenu {{ visibility: hidden; }}
     </style>
-
-    <!-- Logo -->
-    <div class="sso-logo">
-        <div class="sso-logo-main">TAG</div>
-        <div class="sso-logo-sub">G E S T &Atilde; O</div>
-    </div>
-
-    <!-- Card -->
-    <div class="sso-card">
-        <div class="sso-icon">{_SHIELD_SVG}</div>
-        <div class="sso-title">Acesso Restrito</div>
-        <div class="sso-divider"></div>
-        <div class="sso-msg">
-            Este relat&oacute;rio requer autentica&ccedil;&atilde;o via
-            <strong>Portal TAG Gest&atilde;o</strong>.<br>
-            Fa&ccedil;a login no portal e acesse pelo card correspondente.
-        </div>
-        <a href="{PORTAL_URL}" target="_self" class="sso-btn">
-            Acessar Portal TAG Gest&atilde;o
-        </a>
-    </div>
-
-    <!-- Footer -->
-    <div class="sso-footer">TAG Investimentos &middot; Acesso Seguro</div>
     """, unsafe_allow_html=True)
+
+    # ── Logo ──
+    st.markdown(
+        f'<div class="sso-logo">'
+        f'<div class="sso-logo-main">TAG</div>'
+        f'<div class="sso-logo-sub">G E S T \u00c3 O</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Card with icon, title, message ──
+    st.markdown(
+        f'<div class="sso-card">'
+        f'<div class="sso-icon">'
+        f'<svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">'
+        f'<path d="M12 2L4 5.5V11.5C4 16.45 7.4 21.05 12 22C16.6 21.05 20 16.45 20 11.5V5.5L12 2Z" '
+        f'stroke="#FF8853" stroke-width="1.5" fill="rgba(255,136,83,0.08)"/>'
+        f'<rect x="9.5" y="10" width="5" height="4.5" rx="0.8" '
+        f'stroke="#FF8853" stroke-width="1.3" fill="none"/>'
+        f'<path d="M10.5 10V8.5C10.5 7.67 11.17 7 12 7C12.83 7 13.5 7.67 13.5 8.5V10" '
+        f'stroke="#FF8853" stroke-width="1.3" fill="none" stroke-linecap="round"/>'
+        f'<circle cx="12" cy="12" r="0.6" fill="#FF8853"/>'
+        f'</svg>'
+        f'</div>'
+        f'<div class="sso-title">Acesso Restrito</div>'
+        f'<div class="sso-divider"></div>'
+        f'<div class="sso-msg">'
+        f'Este relat\u00f3rio requer autentica\u00e7\u00e3o via '
+        f'<strong>Portal TAG Gest\u00e3o</strong>.<br>'
+        f'Fa\u00e7a login no portal e acesse pelo card correspondente.'
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Button (Streamlit native — guaranteed to work) ──
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.link_button(
+            "\U0001F512  Acessar Portal TAG Gest\u00e3o",
+            PORTAL_URL,
+            use_container_width=True,
+        )
+
+    # ── Footer ──
+    st.markdown(
+        f'<div class="sso-footer">TAG Investimentos \u00b7 Acesso Seguro</div>',
+        unsafe_allow_html=True,
+    )
 
     st.stop()
 
