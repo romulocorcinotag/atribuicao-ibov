@@ -490,6 +490,7 @@ def render_access_denied():
             box-shadow: 0 4px 16px rgba(255,136,83,0.35);
             transition: all 0.2s ease;
             cursor: pointer;
+            white-space: nowrap;
         }}
         [data-testid="stLinkButton"] a:hover {{
             background: linear-gradient(135deg, #ff9b6a 0%, {_TAG_LARANJA} 100%) !important;
@@ -544,7 +545,7 @@ def render_access_denied():
         unsafe_allow_html=True,
     )
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([0.2, 3, 0.2])
     with col2:
         st.link_button(
             "\U0001f512  Acessar Portal TAG Gest\u00e3o",
