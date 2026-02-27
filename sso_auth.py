@@ -9,7 +9,16 @@ import os
 from datetime import datetime, timezone
 
 # ── Configuration ──────────────────────────────────────
-SSO_SECRET = os.environ.get("SSO_SECRET", "") or st.secrets.get("SSO_SECRET", "")
+def _get_sso_secret():
+    secret = os.environ.get("SSO_SECRET", "")
+    if secret:
+        return secret
+    try:
+        return st.secrets["SSO_SECRET"]
+    except Exception:
+        return ""
+
+SSO_SECRET = _get_sso_secret()
 SSO_ALGORITHM = "HS256"
 PORTAL_URL = "https://tag-gestao.streamlit.app"
 
