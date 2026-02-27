@@ -475,30 +475,30 @@ def render_access_denied():
             color: {_TAG_OFFWHITE};
             font-weight: 600;
         }}
-        .sso-btn {{
+        [data-testid="stLinkButton"] a {{
             display: inline-block;
             width: 100%;
-            padding: 14px 28px;
-            background: linear-gradient(135deg, {_TAG_LARANJA} 0%, #e06a30 100%);
+            padding: 14px 28px !important;
+            background: linear-gradient(135deg, {_TAG_LARANJA} 0%, #e06a30 100%) !important;
             color: #ffffff !important;
-            font-size: 0.95rem;
-            font-weight: 700;
+            font-size: 0.95rem !important;
+            font-weight: 700 !important;
             letter-spacing: 0.04em;
             text-decoration: none !important;
-            border-radius: 10px;
-            border: none;
+            border-radius: 10px !important;
+            border: none !important;
             box-shadow: 0 4px 16px rgba(255,136,83,0.35);
             transition: all 0.2s ease;
             cursor: pointer;
         }}
-        .sso-btn:hover {{
-            background: linear-gradient(135deg, #ff9b6a 0%, {_TAG_LARANJA} 100%);
+        [data-testid="stLinkButton"] a:hover {{
+            background: linear-gradient(135deg, #ff9b6a 0%, {_TAG_LARANJA} 100%) !important;
             box-shadow: 0 6px 24px rgba(255,136,83,0.5);
             transform: translateY(-1px);
             color: #ffffff !important;
             text-decoration: none !important;
         }}
-        .sso-btn:active {{
+        [data-testid="stLinkButton"] a:active {{
             transform: translateY(0px);
             box-shadow: 0 2px 8px rgba(255,136,83,0.3);
         }}
@@ -540,10 +540,17 @@ def render_access_denied():
         f'<strong>Portal TAG Gest\u00e3o</strong>.<br>'
         f'Fa\u00e7a login no portal e acesse pelo card correspondente.'
         f'</div>'
-        f'<a href="{PORTAL_URL}" target="_self" class="sso-btn">\U0001f512  Acessar Portal TAG Gest\u00e3o</a>'
         f'</div>',
         unsafe_allow_html=True,
     )
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.link_button(
+            "\U0001f512  Acessar Portal TAG Gest\u00e3o",
+            PORTAL_URL,
+            use_container_width=True,
+        )
 
     st.markdown(
         f'<div class="sso-footer">TAG Investimentos \u00b7 Acesso Seguro</div>',
